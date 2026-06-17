@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+@theme {
+  --font-sans: "Aptos", "Segoe UI Variable", "Segoe UI", sans-serif;
+  --font-display: "Aptos Display", "Aptos", "Segoe UI Variable", sans-serif;
+}
+
+:root {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+body {
+  background-color: #eef6f4;
+  color: #0f172a;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+:root[data-theme="dark"] body {
+  background-color: #020617;
+  color: #f8fafc;
+}
+
+input,
+textarea,
+button {
+  font: inherit;
+}
+
+::selection {
+  background-color: rgba(20, 184, 166, 0.25);
+  color: #0f172a;
+}

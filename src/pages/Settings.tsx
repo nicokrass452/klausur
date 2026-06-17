@@ -1,0 +1,89 @@
+import { requestNotificationPermission } from "../services/notificationService";
+import { useAppStore } from "../store/useAppStore";
+
+export function SettingsPage() {
+  const settings = useAppStore((state) => state.settings);
+  const user = useAppStore((state) => state.user);
+  const syncStatus = useAppStore((state) => state.syncStatus);
+  const lastSyncedAt = useAppStore((state) => state.lastSyncedAt);
+  const syncError = useAppStore((state) => state.syncError);
+  const updateReminderSettings = useAppStore((state) => state.updateReminderSettings);
+  const setTheme = useAppStore((state) => state.setTheme);
+  const setDefaultDailyMinutes = useAppStore((state) => state.setDefaultDailyMinutes);
+  const enableCloudSync = useAppStore((state) => state.enableCloudSync);
+  const syncNow = useAppStore((state) => state.syncNow);
+  const logout = useAppStore((state) => state.logout);
+
+  return (
+    <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+      <section className="rounded-[32px] border border-white/50 bg-white/80 p-6 shadow-panel dark:border-slate-800 dark:bg-slate-900/80">
+        <h3 className="font-display text-2xl text-slate-950 dark:text-white">Darstellung</h3>
+        <div className="mt-5 flex flex-wrap gap-3">
+          {(["light", "dark", "system"] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setTheme(mode)}
+              className={`rounded-full px-4 py-3 text-sm font-semibold ${settings.theme === mode ? "bg-slate-950 text-white dark:bg-teal-500 dark:text-slate-950" : "border border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"}`}
+            >
+              {mode}
+            </button>
+          ))}
+        </div>
+
+        <h3 className="mt-8 font-display text-2xl text-slate-950 dark:text-white">Erinnerungen</h3>
+        <div className="mt-5 space-y-4">
+          <label className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/80 px-4 py-3 dark:border-slate-800">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Taegliche Lernreminder</span>
+            <input type="checkbox" checked={settings.reminders.dailyReminder} onChange={(event) => updateReminderSettings({ dailyReminder: event.target.checked })} />
+          </label>
+          <label className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/80 px-4 py-3 dark:border-slate-800">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Heute-lernen Hinweis</span>
+            <input type="checkbox" checked={settings.reminders.todayLearningReminder} onChange={(event) => updateReminderSettings({ todayLearningReminder: event.target.checked })} />
+          </label>
+          <button
+            onClick={async () => {
+              const permission = await requestNotificationPermission();
+              updateReminderSettings({ notificationsEnabled: permission === "granted" });
+            }}
+            className="rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white dark:bg-teal-500 dark:text-slate-950"
+          >
+            Push Notifications aktivieren
+          </button>
+        </div>
+      </section>
+
+      <section className="rounded-[32px] border border-white/50 bg-white/80 p-6 shadow-panel dark:border-slate-800 dark:bg-slate-900/80">
+        <h3 className="font-display text-2xl text-slate-950 dark:text-white">Daten & Sync</h3>
+        <label className="mt-5 block text-sm font-medium text-slate-700 dark:text-slate-200">
+          Standard-Lernzeit
+          <input className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950" type="number" min="15" step="5" value={settings.defaultDailyMinutes} onChange={(event) => setDefaultDailyMinutes(Number(event.target.value))} />
+        </label>
+
+        <div className="mt-6 space-y-4 rounded-3xl border border-slate-200/80 p-4 dark:border-slate-800">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">Supabase Cloud Sync</p>
+              <p className="text-sm text-slate-500">{user?.email ?? "Nicht angemeldet"}</p>
+            </div>
+            <input type="checkbox" checked={settings.cloudSyncEnabled} onChange={(event) => void enableCloudSync(event.target.checked)} />
+          </div>
+          <button
+            onClick={() => void syncNow()}
+            className="rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white dark:bg-teal-500 dark:text-slate-950"
+          >
+            Jetzt synchronisieren
+          </button>
+          <p className="text-sm text-slate-500">Status: {syncStatus}</p>
+          <p className="text-sm text-slate-500">Letzter Sync: {lastSyncedAt ? new Date(lastSyncedAt).toLocaleString("de-DE") : "-"}</p>
+          {syncError ? <p className="text-sm text-rose-600 dark:text-rose-300">{syncError}</p> : null}
+          <button
+            onClick={() => void logout()}
+            className="rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
+          >
+            Logout
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
