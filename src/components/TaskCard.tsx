@@ -11,7 +11,7 @@ interface TaskCardProps {
 
 export function TaskCard({ task, exam, onComplete, onMissed }: TaskCardProps) {
   return (
-    <article className="rounded-3xl border border-white/50 bg-white/80 p-4 shadow-panel dark:border-slate-800 dark:bg-slate-900/80">
+    <article className="surface-card p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{exam?.subject ?? "Lernen"}</p>

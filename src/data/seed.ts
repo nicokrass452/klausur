@@ -98,6 +98,7 @@ export const seedSnapshot: AppSnapshot = {
     calendarMode: "month",
     defaultDailyMinutes: 40,
     cloudSyncEnabled: false,
+    tutorialCompleted: false,
     reminders: {
       dailyReminder: true,
       todayLearningReminder: true,

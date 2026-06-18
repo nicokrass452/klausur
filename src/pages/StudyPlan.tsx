@@ -4,6 +4,12 @@ import { TaskCard } from "../components/TaskCard";
 import { generateFlashcardsFromTopicsResult, generateQuizFromTopicsResult, optimizeStudyPlanWithAiResult } from "../services/aiService";
 import { useAppStore } from "../store/useAppStore";
 
+function aiSourceName(source: "glm" | "deepseek" | "mock"): string {
+  if (source === "glm") return "GLM";
+  if (source === "deepseek") return "DeepSeek";
+  return "Mock";
+}
+
 export function StudyPlanPage() {
   const allExams = useAppStore((state) => state.exams);
   const allStudyTasks = useAppStore((state) => state.studyTasks);
@@ -39,7 +45,7 @@ export function StudyPlanPage() {
               try {
                 const result = await optimizeStudyPlanWithAiResult(sortedTasks);
                 setAiError(result.error);
-                setAiSummary(`${result.source === "gemini" ? "Gemini" : "Mock"} priorisiert ${result.data.slice(0, 3).map((task) => task.task).join(", ")}.`);
+                setAiSummary(`${aiSourceName(result.source)} priorisiert ${result.data.slice(0, 3).map((task) => task.task).join(", ")}.`);
               } finally {
                 setAiLoading(false);
               }
@@ -57,7 +63,7 @@ export function StudyPlanPage() {
               try {
                 const result = await generateQuizFromTopicsResult(topics);
                 setAiError(result.error);
-                setAiSummary(`${result.source === "gemini" ? "Gemini" : "Mock"} hat ${result.data.length} Fragen aus deinen Themen erzeugt.`);
+                setAiSummary(`${aiSourceName(result.source)} hat ${result.data.length} Fragen aus deinen Themen erzeugt.`);
               } finally {
                 setAiLoading(false);
               }
@@ -74,7 +80,7 @@ export function StudyPlanPage() {
               try {
                 const result = await generateFlashcardsFromTopicsResult(topics);
                 setAiError(result.error);
-                setAiSummary(`${result.source === "gemini" ? "Gemini" : "Mock"} hat ${result.data.length} Karten vorbereitet.`);
+                setAiSummary(`${aiSourceName(result.source)} hat ${result.data.length} Karten vorbereitet.`);
               } finally {
                 setAiLoading(false);
               }

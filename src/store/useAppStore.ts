@@ -55,6 +55,8 @@ interface AppStore extends AppSnapshot {
   logout: () => Promise<void>;
   syncNow: (retryCount?: number) => Promise<void>;
   enableCloudSync: (enabled: boolean) => Promise<void>;
+  completeTutorial: () => void;
+  resetTutorial: () => void;
 }
 
 function nowIso(): string {
@@ -288,7 +290,7 @@ export const useAppStore = create<AppStore>()(
           isAuthenticated: Boolean(user),
           settings: {
             ...state.settings,
-            cloudSyncEnabled: user ? state.settings.cloudSyncEnabled : false
+            cloudSyncEnabled: Boolean(user)
           }
         })),
 
@@ -372,7 +374,17 @@ export const useAppStore = create<AppStore>()(
         const profile = await ensureProfile({ ...get().user!, cloudSyncEnabled: enabled, updatedAt: nowIso() });
         set({ user: profile });
         await get().syncNow();
-      }
+      },
+
+      completeTutorial: () =>
+        set((state) => ({
+          settings: { ...state.settings, tutorialCompleted: true }
+        })),
+
+      resetTutorial: () =>
+        set((state) => ({
+          settings: { ...state.settings, tutorialCompleted: false }
+        }))
     }),
     {
       name: "klausurplaner-store",
@@ -391,6 +403,9 @@ export const useAppStore = create<AppStore>()(
         syncError: state.syncError
       }),
       onRehydrateStorage: () => (state) => {
+        if (state && state.settings.tutorialCompleted === undefined) {
+          state.settings.tutorialCompleted = false;
+        }
         state?.syncBadges();
         if (state) state.hasHydrated = true;
       }

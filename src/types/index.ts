@@ -105,6 +105,7 @@ export interface AppSettings {
   defaultDailyMinutes: number;
   reminders: ReminderSettings;
   cloudSyncEnabled: boolean;
+  tutorialCompleted: boolean;
 }
 
 export interface QuizQuestion {

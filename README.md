@@ -54,17 +54,19 @@ Damit der Login funktioniert, muss Google in Supabase aktiviert sein:
 3. In Supabase `Authentication` -> `URL Configuration` die Redirect URL `http://localhost:5177/dashboard` erlauben.
 4. In der Google Cloud Console dieselbe Redirect URL fuer den OAuth Client erlauben, falls sie dort noch fehlt.
 
-## Gemini KI ueber Supabase Edge Function
+## GLM KI mit DeepSeek-Fallback ueber Supabase Edge Function
 
-Die Gemini API wird nicht direkt aus dem Browser aufgerufen. Das Frontend ruft `supabase.functions.invoke("ai-coach")` auf; die Edge Function prueft das Supabase Auth JWT, validiert Eingaben, begrenzt Requests pro Nutzer und ruft erst dann Google Gemini auf. Bei Fehlern nutzt das Frontend automatisch den lokalen Mock-Fallback.
+Die GLM API von Zhipu und die DeepSeek API werden nicht direkt aus dem Browser aufgerufen. Das Frontend ruft `supabase.functions.invoke("ai-coach")` auf; die Edge Function prueft das Supabase Auth JWT, validiert Eingaben, begrenzt Requests pro Nutzer und ruft erst GLM auf. Wenn GLM nicht erreichbar ist, wird DeepSeek versucht. Erst wenn beide Provider fehlschlagen, nutzt das Frontend automatisch den lokalen Mock-Fallback.
 
 Edge Function deployen:
 
 ```powershell
 supabase login
 supabase link --project-ref <dein-project-ref>
-supabase secrets set GEMINI_API_KEY="<dein-google-ai-studio-api-key>"
-supabase secrets set GEMINI_MODEL="gemini-2.0-flash"
+supabase secrets set GLM_API_KEY="<dein-zhipu-api-key>"
+supabase secrets set GLM_MODEL="glm-4-flash"
+supabase secrets set DEEPSEEK_API_KEY="<dein-deepseek-api-key>"
+supabase secrets set DEEPSEEK_MODEL="deepseek-v4-flash"
 supabase functions deploy ai-coach
 ```
 
@@ -77,11 +79,16 @@ supabase functions serve ai-coach --env-file ./supabase/.env.local
 `supabase/.env.local` sollte nur lokal existieren und nicht ins Frontend:
 
 ```text
-GEMINI_API_KEY=...
-GEMINI_MODEL=gemini-2.0-flash
+GLM_API_KEY=...
+GLM_MODEL=glm-4-flash
+DEEPSEEK_API_KEY=...
+DEEPSEEK_MODEL=deepseek-v4-flash
 ```
 
-Wichtig: `GEMINI_API_KEY` nicht in `.env`, `.env.example` oder als `VITE_*` Variable eintragen. Nur Supabase Secrets oder lokale Function-ENV verwenden.
+Optional kann `GLM_API_BASE` gesetzt werden, falls Zhipu einen anderen OpenAI-kompatiblen Chat-Completions-Endpunkt verwenden soll. Standard ist `https://open.bigmodel.cn/api/paas/v4/chat/completions`.
+Optional kann `DEEPSEEK_API_BASE` gesetzt werden. Standard ist `https://api.deepseek.com/chat/completions`.
+
+Wichtig: `GLM_API_KEY` und `DEEPSEEK_API_KEY` nicht in `.env`, `.env.example` oder als `VITE_*` Variable eintragen. Nur Supabase Secrets oder lokale Function-ENV verwenden.
 
 ## MVP-Funktionen
 
@@ -95,6 +102,7 @@ Wichtig: `GEMINI_API_KEY` nicht in `.env`, `.env.example` oder als `VITE_*` Vari
 - Kalenderansicht fuer Woche und Monat
 - Pomodoro-Fokusmodus 25/5
 - Analytics mit Lernzeit, Fortschritt und Schwachstellen
+- AI Trainer als Chat mit Coach-, Quiz-, Flashcard-, Plan- und Erklaermodus
 - Dark Mode, LocalStorage, Manifest, Service Worker, Offline-Cache
 
 ## Projektstruktur

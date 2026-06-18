@@ -36,7 +36,7 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       <section className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
-        <article className="rounded-[32px] bg-gradient-to-br from-teal-500 via-cyan-400 to-orange-300 p-7 text-slate-950 shadow-panel">
+        <article className="rounded-[28px] border border-teal-200/60 bg-gradient-to-br from-teal-500/95 via-cyan-400/90 to-orange-300/85 p-6 text-slate-950 shadow-panel md:p-7">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-900/70">Naechste Klausur</p>
           <div className="mt-5 flex flex-wrap items-end justify-between gap-4">
             <div>
@@ -62,7 +62,7 @@ export function DashboardPage() {
           </div>
         </article>
 
-        <article className="rounded-[32px] border border-white/50 bg-white/80 p-6 shadow-panel dark:border-slate-800 dark:bg-slate-900/80">
+        <article className="surface-card p-6">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Lerncoach</p>
           <h3 className="mt-3 font-display text-2xl text-slate-950 dark:text-white">{coachMessage?.title ?? "Coach laedt..."}</h3>
           <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{coachMessage?.body ?? "Analyse deiner offenen Aufgaben und Streak-Daten."}</p>
@@ -77,7 +77,7 @@ export function DashboardPage() {
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-        <article className="rounded-[32px] border border-white/50 bg-white/80 p-6 shadow-panel dark:border-slate-800 dark:bg-slate-900/80">
+        <article className="surface-card p-6">
           <div className="flex items-center justify-between">
             <h3 className="font-display text-2xl text-slate-950 dark:text-white">Heute lernen</h3>
             <Link to={ROUTES.studyPlan} className="text-sm font-semibold text-teal-700 dark:text-teal-300">Alle Aufgaben</Link>
@@ -94,7 +94,7 @@ export function DashboardPage() {
           </div>
         </article>
 
-        <article className="rounded-[32px] border border-white/50 bg-white/80 p-6 shadow-panel dark:border-slate-800 dark:bg-slate-900/80">
+        <article className="surface-card p-6">
           <h3 className="font-display text-2xl text-slate-950 dark:text-white">Fortschritt pro Klausur</h3>
           <div className="mt-5 space-y-5">
             {exams.map((exam) => {

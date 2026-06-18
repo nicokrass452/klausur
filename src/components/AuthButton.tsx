@@ -13,7 +13,7 @@ export function AuthButton() {
     return (
       <button
         onClick={() => navigate(ROUTES.login)}
-        className="inline-flex items-center gap-2 rounded-full border border-white/50 bg-white/80 px-4 py-3 text-sm font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-200"
+        className="inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
       >
         <LogIn size={16} />
         Login
@@ -27,7 +27,7 @@ export function AuthButton() {
         await logout();
         navigate(ROUTES.login, { replace: true });
       }}
-      className="inline-flex items-center gap-2 rounded-full border border-white/50 bg-white/80 px-4 py-3 text-sm font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-200"
+      className="inline-flex max-w-[10rem] items-center gap-2 truncate rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
     >
       <LogOut size={16} />
       {user?.fullName ?? user?.email ?? "Logout"}

@@ -1,7 +1,10 @@
+import { useNavigate } from "react-router-dom";
+import { ROUTES } from "../lib/constants";
 import { requestNotificationPermission } from "../services/notificationService";
 import { useAppStore } from "../store/useAppStore";
 
 export function SettingsPage() {
+  const navigate = useNavigate();
   const settings = useAppStore((state) => state.settings);
   const user = useAppStore((state) => state.user);
   const syncStatus = useAppStore((state) => state.syncStatus);
@@ -13,6 +16,7 @@ export function SettingsPage() {
   const enableCloudSync = useAppStore((state) => state.enableCloudSync);
   const syncNow = useAppStore((state) => state.syncNow);
   const logout = useAppStore((state) => state.logout);
+  const resetTutorial = useAppStore((state) => state.resetTutorial);
 
   return (
     <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
@@ -29,6 +33,20 @@ export function SettingsPage() {
             </button>
           ))}
         </div>
+
+        <h3 className="mt-8 font-display text-2xl text-slate-950 dark:text-white">Einfuehrung</h3>
+        <p className="mt-2 text-sm text-slate-500">
+          {settings.tutorialCompleted ? "Du hast die Einfuehrung abgeschlossen." : "Die Einfuehrung wird beim naechsten Seitenaufruf angezeigt."}
+        </p>
+        <button
+          onClick={() => {
+            resetTutorial();
+            navigate(ROUTES.dashboard);
+          }}
+          className="mt-4 rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
+        >
+          Einfuehrung erneut starten
+        </button>
 
         <h3 className="mt-8 font-display text-2xl text-slate-950 dark:text-white">Erinnerungen</h3>
         <div className="mt-5 space-y-4">

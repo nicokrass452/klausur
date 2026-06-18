@@ -1,8 +1,13 @@
 import type { CoachMessage, Flashcard, QuizQuestion, StudyTask, Topic, UserStats } from "../types";
 import { supabase } from "../lib/supabase";
 
-type AiAction = "generateQuiz" | "generateFlashcards" | "optimizeStudyPlan" | "coachMessage";
-type AiSource = "gemini" | "mock";
+type AiAction = "generateQuiz" | "generateFlashcards" | "optimizeStudyPlan" | "coachMessage" | "coachChat";
+type AiSource = "glm" | "deepseek" | "mock";
+export type CoachChatMode = "coach" | "quiz" | "flashcards" | "plan" | "explain";
+export interface CoachChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -10,6 +15,10 @@ export interface AiResult<T> {
   data: T;
   source: AiSource;
   error?: string;
+}
+
+export interface CoachChatResponse {
+  message: string;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -102,12 +111,15 @@ async function errorMessage(error: unknown): Promise<string> {
       const body = await context.clone().json();
       const flatError = (body as { error?: unknown }).error;
       if (typeof flatError === "string") {
-        const detail = body as { geminiHttpStatus?: number; geminiErrorText?: string; model?: string; hasGeminiApiKey?: boolean };
+        const detail = body as { aiHttpStatus?: number; aiErrorText?: string; model?: string; hasAiApiKey?: boolean };
         const parts = [flatError];
-        if (detail.geminiHttpStatus) parts.push(`Gemini HTTP ${detail.geminiHttpStatus}`);
+        if (flatError === "Unbekannte KI-Aktion.") {
+          parts.push("Edge Function neu deployen: supabase functions deploy ai-coach");
+        }
+        if (detail.aiHttpStatus) parts.push(`AI HTTP ${detail.aiHttpStatus}`);
         if (detail.model) parts.push(`Modell ${detail.model}`);
-        if (typeof detail.hasGeminiApiKey === "boolean") parts.push(`API-Key vorhanden: ${detail.hasGeminiApiKey}`);
-        if (detail.geminiErrorText) parts.push(detail.geminiErrorText);
+        if (typeof detail.hasAiApiKey === "boolean") parts.push(`API-Key vorhanden: ${detail.hasAiApiKey}`);
+        if (detail.aiErrorText) parts.push(detail.aiErrorText);
         return parts.join(" - ");
       }
       const edgeError = flatError as { code?: string; message?: string } | undefined;
@@ -133,37 +145,21 @@ async function invokeAiCoach<T>(
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError) throw sessionError;
     const accessToken = sessionData.session?.access_token;
-    if (!accessToken) throw new Error("Kein Login vorhanden. KI nutzt den Mock-Fallback.");
 
     if (import.meta.env.DEV) {
-      console.debug("AI auth header present", Boolean(accessToken), accessToken?.slice(0, 12));
+      console.debug("AI auth header present", Boolean(accessToken));
     }
 
-    const response = await fetch(`${supabaseUrl}/functions/v1/ai-coach`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${accessToken}`,
-        "apikey": supabaseAnonKey
-      },
-      body: JSON.stringify({ action, payload })
+    const { data, error } = await supabase.functions.invoke("ai-coach", {
+      body: { action, payload },
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined
     });
 
-    const text = await response.text();
-    let parsed: unknown = null;
-    if (text.trim()) {
-      try {
-        parsed = JSON.parse(text);
-      } catch {
-        throw new Error(`Edge Function HTTP ${response.status}: ${text.slice(0, 300)}`);
-      }
-    }
+    if (error) throw error;
+    const parsed = data as { data?: unknown; error?: unknown; fallback?: boolean; source?: AiSource } | null;
+    if (parsed?.fallback && typeof parsed.error === "string") console.warn(parsed.error);
 
-    if (!response.ok) {
-      throw new Error(`Edge Function HTTP ${response.status}: ${text.slice(0, 300)}`);
-    }
-
-    return { data: pick((parsed as { data?: unknown } | null)?.data), source: "gemini" };
+    return { data: pick(parsed?.data), source: parsed?.fallback ? "mock" : parsed?.source ?? "glm" };
   } catch (error) {
     return { data: await fallback(), source: "mock", error: await errorMessage(error) };
   }
@@ -217,6 +213,31 @@ export async function getCoachMessageResult(stats: UserStats, tasks: StudyTask[]
       return value;
     },
     () => mockCoachMessage(stats, tasks)
+  );
+}
+
+export async function sendCoachChatResult(
+  mode: CoachChatMode,
+  messages: CoachChatMessage[],
+  context: Record<string, unknown>
+): Promise<AiResult<CoachChatResponse>> {
+  const lastUserMessage = [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
+  const isGreeting = /^(hi|hallo|hey|moin|servus|hello)\b[!.?]*$/i.test(lastUserMessage.trim());
+  return invokeAiCoach(
+    "coachChat",
+    { mode, messages, context },
+    (value) => {
+      const message = (value as { message?: unknown })?.message;
+      if (typeof message !== "string") throw new Error("Ungueltige KI-Antwort fuer Coach-Chat.");
+      return { message };
+    },
+    async () => ({
+      message: isGreeting
+        ? "Hi. Wobei soll ich dir helfen: Thema erklaeren, Quiz abfragen, Flashcards erstellen oder den heutigen Lernplan sortieren?"
+        : lastUserMessage
+        ? `Ich kann den KI-Provider gerade nicht erreichen. Fuer "${lastUserMessage}" starte mit drei Punkten: Kernbegriffe sammeln, eine Beispielaufgabe loesen, offene Fragen notieren.`
+        : "Ich kann den KI-Provider gerade nicht erreichen. Starte mit einer kurzen Wiederholung und formuliere danach eine konkrete Frage."
+    })
   );
 }
 

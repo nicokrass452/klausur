@@ -6,6 +6,7 @@ export const ROUTES = {
   dashboard: "/dashboard",
   calendar: "/calendar",
   exams: "/exams",
+  coach: "/coach",
   studyPlan: "/study-plan",
   focus: "/focus",
   analytics: "/analytics",

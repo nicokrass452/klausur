@@ -2,23 +2,16 @@ import { Bell, Download, MoonStar, SunMedium } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { APP_NAME } from "../lib/constants";
+import { PAGE_TITLES } from "../lib/navigation";
 import { requestNotificationPermission } from "../services/notificationService";
 import { useAppStore } from "../store/useAppStore";
 import { AuthButton } from "./AuthButton";
+import { GuestBanner } from "./GuestBanner";
 import { MobileNav } from "./MobileNav";
+import { OnboardingTutorial } from "./OnboardingTutorial";
 import { Sidebar } from "./Sidebar";
 import { SyncStatusBadge } from "./SyncStatusBadge";
 import { XpBadge } from "./XpBadge";
-
-const titles: Record<string, string> = {
-  "/dashboard": "Dashboard",
-  "/calendar": "Kalender",
-  "/exams": "Klausuren",
-  "/study-plan": "Lernplan",
-  "/focus": "Fokusmodus",
-  "/analytics": "Analytics",
-  "/settings": "Einstellungen"
-};
 
 export function Layout() {
   const location = useLocation();
@@ -41,55 +34,68 @@ export function Layout() {
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
+  const pageTitle = PAGE_TITLES[location.pathname] ?? "Klausurdetail";
+
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(15,118,110,0.18),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(249,115,22,0.14),_transparent_28%)]">
-      <div className="flex min-h-screen">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(15,118,110,0.12),_transparent_32%),radial-gradient(circle_at_top_right,_rgba(249,115,22,0.08),_transparent_28%)]" />
+      <div className="relative flex min-h-screen">
         <Sidebar />
         <div className="min-w-0 flex-1">
-          <header className="sticky top-0 z-30 border-b border-white/40 bg-white/60 px-4 py-4 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/55 md:px-8">
-            <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">{APP_NAME}</p>
-                <h2 className="mt-1 font-display text-2xl text-slate-950 dark:text-white">{titles[location.pathname] ?? "Klausurdetail"}</h2>
+          <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/85 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/85">
+            <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 md:px-6 md:py-4">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-slate-400">{APP_NAME}</p>
+                <h2 className="truncate font-display text-xl text-slate-950 dark:text-white md:text-2xl">{pageTitle}</h2>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex shrink-0 items-center gap-2 md:gap-3">
                 <button
                   onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/50 bg-white/80 text-slate-700 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-100"
+                  className="inline-flex size-10 items-center justify-center rounded-xl border border-slate-200/80 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                   aria-label="Theme wechseln"
                 >
-                  {theme === "dark" ? <SunMedium size={18} /> : <MoonStar size={18} />}
+                  {theme === "dark" ? <SunMedium size={17} /> : <MoonStar size={17} />}
                 </button>
-                <button
-                  onClick={async () => {
-                    const permission = await requestNotificationPermission();
-                    updateReminderSettings({ notificationsEnabled: permission === "granted" });
-                  }}
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/50 bg-white/80 text-slate-700 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-100"
-                  aria-label="Benachrichtigungen"
-                >
-                  <Bell size={18} />
-                </button>
-                <button
-                  onClick={async () => {
-                    if (!installPrompt) return;
-                    await installPrompt.prompt();
-                    await installPrompt.userChoice;
-                    setInstallPrompt(null);
-                  }}
-                  className="hidden items-center gap-2 rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white dark:bg-teal-500 dark:text-slate-950 md:inline-flex"
-                >
-                  <Download size={16} />
-                  Installieren
-                </button>
-                {isAuthenticated ? <SyncStatusBadge /> : null}
+                {isAuthenticated ? (
+                  <>
+                    <button
+                      onClick={async () => {
+                        const permission = await requestNotificationPermission();
+                        updateReminderSettings({ notificationsEnabled: permission === "granted" });
+                      }}
+                      className="hidden size-10 items-center justify-center rounded-xl border border-slate-200/80 bg-white text-slate-700 md:inline-flex dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                      aria-label="Benachrichtigungen"
+                    >
+                      <Bell size={17} />
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!installPrompt) return;
+                        await installPrompt.prompt();
+                        await installPrompt.userChoice;
+                        setInstallPrompt(null);
+                      }}
+                      className="hidden items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-semibold text-white lg:inline-flex dark:bg-teal-500 dark:text-slate-950"
+                    >
+                      <Download size={15} />
+                      Installieren
+                    </button>
+                    <SyncStatusBadge />
+                    <div className="md:hidden">
+                      <XpBadge xp={stats.xp} level={stats.level} compact />
+                    </div>
+                    <div className="hidden md:block">
+                      <XpBadge xp={stats.xp} level={stats.level} />
+                    </div>
+                  </>
+                ) : null}
                 <AuthButton />
-                <XpBadge xp={stats.xp} level={stats.level} />
               </div>
             </div>
           </header>
 
-          <main className="mx-auto max-w-7xl px-4 py-6 pb-28 md:px-8">
+          <main className="mx-auto max-w-6xl px-4 py-5 pb-28 md:px-6 md:py-6 md:pb-8 lg:pb-6">
+            {!isAuthenticated ? <GuestBanner /> : null}
             <Outlet />
           </main>
         </div>
@@ -98,14 +104,17 @@ export function Layout() {
       {rewardToast ? (
         <button
           onClick={clearRewardToast}
-          className="fixed right-4 top-24 z-50 rounded-2xl bg-slate-950 px-4 py-3 text-left text-white shadow-panel dark:bg-teal-500 dark:text-slate-950"
+          className="fixed right-4 top-20 z-50 rounded-2xl bg-slate-950 px-4 py-3 text-left text-white shadow-panel dark:bg-teal-500 dark:text-slate-950"
         >
           <p className="text-xs font-semibold uppercase tracking-[0.2em]">XP Update</p>
-          <p className="mt-1 text-sm font-medium">+{rewardToast.amount} XP · {rewardToast.reason}</p>
+          <p className="mt-1 text-sm font-medium">
+            +{rewardToast.amount} XP · {rewardToast.reason}
+          </p>
         </button>
       ) : null}
 
       <MobileNav />
+      {isAuthenticated ? <OnboardingTutorial /> : null}
     </div>
   );
 }

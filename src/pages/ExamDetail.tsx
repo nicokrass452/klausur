@@ -13,6 +13,12 @@ import { TopicChecklist } from "../components/TopicChecklist";
 
 type AiPanel = "quiz" | "flashcards" | "coach";
 
+function aiSourceLabel(source: AiResult<unknown>["source"]): string {
+  if (source === "glm") return "GLM API";
+  if (source === "deepseek") return "DeepSeek API";
+  return "Mock-Fallback";
+}
+
 export function ExamDetailPage() {
   const { id = "" } = useParams();
   const exam = useAppStore((state) => state.exams.find((entry) => entry.id === id && !entry.deletedAt));
@@ -113,10 +119,10 @@ export function ExamDetailPage() {
       <section className="rounded-[32px] border border-white/50 bg-white/80 p-6 shadow-panel dark:border-slate-800 dark:bg-slate-900/80">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Gemini Lernhilfe</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">GLM Lernhilfe</p>
             <h4 className="mt-2 font-display text-2xl text-slate-950 dark:text-white">Quiz, Flashcards und Coach</h4>
             <p className="mt-2 text-sm text-slate-500">
-              Die Anfrage laeuft ueber Supabase Edge Functions. Wenn Gemini nicht erreichbar ist, wird automatisch der Mock-Fallback genutzt.
+              Die Anfrage laeuft ueber Supabase Edge Functions. Wenn GLM nicht erreichbar ist, wird DeepSeek als Fallback genutzt.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -149,7 +155,7 @@ export function ExamDetailPage() {
 
         {aiSource ? (
           <p className="mt-4 text-sm text-slate-500">
-            Quelle: {aiSource === "gemini" ? "Gemini API" : "Mock-Fallback"}
+            Quelle: {aiSourceLabel(aiSource)}
             {aiError ? ` - ${aiError}` : ""}
           </p>
         ) : null}

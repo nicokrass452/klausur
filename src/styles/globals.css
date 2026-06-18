@@ -16,7 +16,7 @@
 }
 
 body {
-  background-color: #eef6f4;
+  background-color: #f8fafc;
   color: #0f172a;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -26,6 +26,18 @@ body {
 :root[data-theme="dark"] body {
   background-color: #020617;
   color: #f8fafc;
+}
+
+.surface-card {
+  border-radius: 1.25rem;
+  border: 1px solid rgb(226 232 240 / 0.9);
+  background: rgb(255 255 255 / 0.92);
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+}
+
+:root[data-theme="dark"] .surface-card {
+  border-color: rgb(30 41 59 / 0.9);
+  background: rgb(15 23 42 / 0.82);
 }
 
 input,

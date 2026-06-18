@@ -15,7 +15,7 @@ export function ExamCard({ exam, topics }: ExamCardProps) {
   return (
     <Link
       to={`/exams/${exam.id}`}
-      className="block rounded-[28px] border border-white/50 bg-white/80 p-5 shadow-panel transition hover:-translate-y-0.5 dark:border-slate-800 dark:bg-slate-900/80"
+      className="surface-card block p-5 transition hover:-translate-y-0.5 hover:shadow-lg"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
