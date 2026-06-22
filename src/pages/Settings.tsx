@@ -95,12 +95,46 @@ export function SettingsPage() {
           <p className="text-sm text-slate-500">Status: {syncStatus}</p>
           <p className="text-sm text-slate-500">Letzter Sync: {lastSyncedAt ? new Date(lastSyncedAt).toLocaleString("de-DE") : "-"}</p>
           {syncError ? <p className="text-sm text-rose-600 dark:text-rose-300">{syncError}</p> : null}
-          <button
-            onClick={() => void logout()}
-            className="rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
-          >
-            Logout
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => void logout()}
+              className="rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
+            >
+              Logout
+            </button>
+            <button
+              onClick={async () => {
+                const { resetPasswordForEmail } = await import("../services/syncService");
+                if (user?.email) {
+                  try {
+                    await resetPasswordForEmail(user.email);
+                    alert("Passwort-Reset-E-Mail gesendet!");
+                  } catch (e: any) {
+                    alert(e.message);
+                  }
+                }
+              }}
+              className="rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
+            >
+              Passwort zurücksetzen
+            </button>
+            <button
+              onClick={async () => {
+                if (confirm("Möchtest du deinen Account und alle Daten wirklich dauerhaft löschen?")) {
+                  const { deleteUserAccount } = await import("../services/syncService");
+                  try {
+                    await deleteUserAccount();
+                    navigate(ROUTES.login);
+                  } catch (e: any) {
+                    alert("Fehler beim Löschen: " + e.message);
+                  }
+                }
+              }}
+              className="rounded-full bg-rose-100 px-4 py-3 text-sm font-semibold text-rose-600 dark:bg-rose-900/40 dark:text-rose-400"
+            >
+              Account löschen
+            </button>
+          </div>
         </div>
       </section>
     </div>

@@ -255,6 +255,21 @@ export async function signInWithEmail(email: string, password: string): Promise<
   if (error) throw mapAuthError(error);
 }
 
+export async function resetPasswordForEmail(email: string): Promise<void> {
+  const client = requireSupabase();
+  const { error } = await client.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + "/settings",
+  });
+  if (error) throw mapAuthError(error);
+}
+
+export async function deleteUserAccount(): Promise<void> {
+  const client = requireSupabase();
+  const { error } = await client.rpc("delete_user_account");
+  if (error) throw new Error(formatSupabaseError(error));
+  await signOut();
+}
+
 export async function signUpWithEmail(
   email: string,
   password: string

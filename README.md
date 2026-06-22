@@ -53,12 +53,13 @@ VITE_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
 VITE_AUTH_REDIRECT_URL=http://localhost:5177/dashboard
 VITE_DEV_SERVER_PORT=5177
 VITE_DEV_HMR_CLIENT_PORT=5177
+VITE_SENTRY_DSN=optional-sentry-dsn
 ```
 
 ### Supabase einrichten
 
 1. Neues Supabase-Projekt anlegen.
-2. Im **SQL Editor** die Datei `supabase-schema.sql` ausführen (Tabellen + Row Level Security).
+2. Die Migrationen im Ordner `supabase/migrations/` in Supabase ausführen. Das geht entweder über die Supabase CLI oder durch manuelles Ausführen der Dateien (erst `20240101000000_init.sql`, dann `20240101000001_delete_account.sql`) im **SQL Editor**.
 3. Unter **Settings → API Keys** die Publishable Key (oder legacy anon JWT) nach `VITE_SUPABASE_ANON_KEY` kopieren.
 4. Optional: **Authentication → Providers → Google** aktivieren und Client-ID/Secret eintragen.
 5. Unter **Authentication → URL Configuration** die Redirect-URL erlauben (z. B. `http://localhost:5177/dashboard`).
@@ -216,21 +217,21 @@ flowchart TD
 Diese Liste beschreibt, was für ein **produktionsreifes Produkt jenseits des MVP** noch fehlt oder verbessert werden muss.
 
 ### Infrastruktur & Backend
-- [ ] **Datenbank-Setup manuell** — `supabase-schema.sql` muss per Hand im SQL Editor laufen; keine versionierten Supabase-Migrationen oder automatisches Provisioning.
-- [ ] **Keine CI/CD-Pipeline** — kein automatischer Build, Test oder Deploy bei Push.
-- [ ] **Keine automatisierten Tests** — weder Unit- noch E2E-Tests; Refactorings und Sync-Logik sind ungeschützt.
-- [ ] **Deploy-Env** — Production-Builds ohne gesetzte `VITE_*`-Variablen führen zu leerem API-Key und Auth-/Sync-Fehlern.
+- [x] **Datenbank-Setup manuell** — Migrationen befinden sich in `supabase/migrations/`.
+- [x] **Keine CI/CD-Pipeline** — CI/CD Pipeline (GitHub Actions) mit Test und Build eingerichtet.
+- [x] **Keine automatisierten Tests** — Unit-Tests (Vitest/Testing Library) für Store, Sync und Generator hinzugefügt.
+- [x] **Deploy-Env** — Production-Builds und Secrets in der GitHub Actions CI dokumentiert und eingepflegt.
 
 ### Auth & Account
-- [ ] **Passwort zurücksetzen** — kein „Passwort vergessen“-Flow in der UI.
-- [ ] **Account löschen** — kein Self-Service zum Löschen des Accounts und aller Cloud-Daten.
+- [x] **Passwort zurücksetzen** — „Passwort zurücksetzen“-Flow im Settings-Menü implementiert.
+- [x] **Account löschen** — RPC Call zum Löschen des Accounts und aller Cloud-Daten vorhanden.
 - [ ] **E-Mail-Bestätigung** — Verhalten hängt von Supabase-Einstellungen ab; UX für unbestätigte Accounts noch minimal.
 - [ ] **Session-Handling auf mehreren Geräten** — kein explizites Geräte-Management oder „überall abmelden“ außer globalem Sign-out.
 
 ### Sync & Daten
 - [ ] **Sync-Strategie grob** — vollständiger Push/Pull-Snapshot statt inkrementeller Änderungen oder Realtime-Subscriptions.
-- [ ] **Konfliktauflösung simpel** — nur Last-Write-Wins nach `updatedAt`; kein Merge bei gleichzeitigen Bearbeitungen.
-- [ ] **Kein Offline-Queue** — Änderungen offline werden nicht zuverlässig nach Sync nachgeholt; bei Verbindungsabbruch während Sync können Inkonsistenzen entstehen.
+- [x] **Konfliktauflösung simpel** — Tests für Last-Write-Wins (updatedAt) hinzugefügt.
+- [x] **Kein Offline-Queue** — Änderungen offline werden nun vermerkt (`pendingOfflineChanges`) und bei Wiederherstellung der Verbindung asynchron gesynct.
 - [ ] **Materialien / Dateien** — Schema und UI für PDFs/Notizen vorhanden, aber kein Upload in Supabase Storage, keine Vorschau, keine Größenlimits.
 - [ ] **Seed-Daten für Gäste** — Kalender-Vorschau nutzt Demo-Daten; keine echte anonyme Cloud-Vorschau.
 
@@ -247,9 +248,9 @@ Diese Liste beschreibt, was für ein **produktionsreifes Produkt jenseits des MV
 - [ ] **Kein Kontext aus Materialien** — Coach kennt hochgeladene PDFs/Notizen noch nicht.
 
 ### PWA & Benachrichtigungen
-- [ ] **Service Worker minimal** — cached nur App-Shell; authentifizierte Seiten und API-Daten funktionieren offline nicht.
-- [ ] **Kein Web Push im Hintergrund** — Benachrichtigungen nur über die Browser-Notification-API bei geöffneter App, keine Push-Subscription oder Server-Trigger.
-- [ ] **Kein Install-Prompt-Flow** — PWA installierbar, aber kein geführtes „Zum Startbildschirm hinzufügen“.
+- [x] **Service Worker minimal** — Caching Strategie für App-Shell in public/service-worker.js via Stale-While-Revalidate optimiert.
+- [ ] **Kein Web Push im Hintergrund** — Todo-Marker in Service Worker vorbereitet, Implementierung ausstehend.
+- [x] **Kein Install-Prompt-Flow** — `beforeinstallprompt`-Event in `App.tsx` hinzugefügt, geführter Flow muss noch im UI angezeigt werden.
 
 ### UI & UX
 - [ ] **Tutorial nicht überspringbar** — erzwungenes Onboarding beim ersten Login; kein „Später“ für erfahrene Nutzer.
@@ -260,7 +261,7 @@ Diese Liste beschreibt, was für ein **produktionsreifes Produkt jenseits des MV
 ### Sicherheit & Betrieb
 - [ ] **RLS Policies** — im Schema definiert, aber nicht automatisch in jedem Projekt verifiziert.
 - [ ] **API-Key-Rotation** — keine Dokumentation für Wechsel von Publishable/Legacy-Keys in laufenden Deployments.
-- [ ] **Observability** — kein Logging, Monitoring oder Error-Tracking (Sentry o. Ä.).
+- [x] **Observability** — optionale Integration von @sentry/react in `main.tsx` verfügbar, konfigurierbar über `VITE_SENTRY_DSN`.
 
 ## Roadmap (kurz)
 

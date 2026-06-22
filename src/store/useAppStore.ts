@@ -112,6 +112,14 @@ function filterActive<T extends { deletedAt?: string | null }>(items: T[]): T[] 
   return items.filter((item) => !item.deletedAt);
 }
 
+
+function getOfflineSyncState(cloudSyncEnabled: boolean, pendingOfflineChanges: boolean | undefined) {
+  const isOnline = typeof navigator === "undefined" ? true : navigator.onLine;
+  if (!cloudSyncEnabled) return { syncStatus: "idle" as const, pendingOfflineChanges };
+  if (!isOnline) return { syncStatus: "pending_offline" as const, pendingOfflineChanges: true };
+  return { syncStatus: "idle" as const, pendingOfflineChanges };
+}
+
 export const useAppStore = create<AppStore>()(
   persist(
     (set, get) => ({
@@ -120,6 +128,7 @@ export const useAppStore = create<AppStore>()(
       authReady: false,
       rewardToast: undefined,
       isOnline: typeof navigator === "undefined" ? true : navigator.onLine,
+      pendingOfflineChanges: false,
 
       addExam: (payload) =>
         set((state) => {
@@ -134,13 +143,13 @@ export const useAppStore = create<AppStore>()(
           };
           const exams = [...state.exams, exam];
           const tasks = [...state.studyTasks, ...generateStudyPlanForExam(exam, [])];
-          return { exams, studyTasks: tasks, syncStatus: "idle" };
+          return { exams, studyTasks: tasks, ...getOfflineSyncState(get().settings.cloudSyncEnabled, get().pendingOfflineChanges) };
         }),
 
       updateExam: (id, patch) =>
         set((state) => ({
           exams: state.exams.map((exam) => (exam.id === id ? touch({ ...exam, ...patch }) : exam)),
-          syncStatus: "idle"
+          ...getOfflineSyncState(get().settings.cloudSyncEnabled, get().pendingOfflineChanges)
         })),
 
       removeExam: (id) =>
@@ -151,7 +160,7 @@ export const useAppStore = create<AppStore>()(
             topics: state.topics.map((topic) => (topic.examId === id ? { ...topic, deletedAt, updatedAt: deletedAt } : topic)),
             studyTasks: state.studyTasks.map((task) => (task.examId === id ? { ...task, deletedAt, updatedAt: deletedAt } : task)),
             materials: state.materials.map((material) => (material.examId === id ? { ...material, deletedAt, updatedAt: deletedAt } : material)),
-            syncStatus: "idle"
+            ...getOfflineSyncState(get().settings.cloudSyncEnabled, get().pendingOfflineChanges)
           };
         }),
 
@@ -167,18 +176,18 @@ export const useAppStore = create<AppStore>()(
           };
           const topics = [...state.topics, topic];
           const exam = state.exams.find((entry) => entry.id === payload.examId);
-          if (!exam) return { topics, syncStatus: "idle" };
+          if (!exam) return { topics, ...getOfflineSyncState(get().settings.cloudSyncEnabled, get().pendingOfflineChanges) };
           const studyTasks = [
             ...state.studyTasks.filter((task) => task.examId !== payload.examId || task.status === "done"),
             ...generateStudyPlanForExam(exam, topics.filter((entry) => entry.examId === payload.examId && !entry.deletedAt))
           ];
-          return { topics, studyTasks, syncStatus: "idle" };
+          return { topics, studyTasks, ...getOfflineSyncState(get().settings.cloudSyncEnabled, get().pendingOfflineChanges) };
         }),
 
       updateTopic: (id, patch) =>
         set((state) => ({
           topics: state.topics.map((topic) => (topic.id === id ? touch({ ...topic, ...patch }) : topic)),
-          syncStatus: "idle"
+          ...getOfflineSyncState(get().settings.cloudSyncEnabled, get().pendingOfflineChanges)
         })),
 
       toggleTopic: (id) =>
@@ -188,7 +197,7 @@ export const useAppStore = create<AppStore>()(
           return {
             topics,
             stats,
-            syncStatus: "idle",
+            ...getOfflineSyncState(get().settings.cloudSyncEnabled, get().pendingOfflineChanges),
             rewardToast: { amount: 8, reason: "Thema erledigt", at: Date.now() }
           };
         }),
@@ -200,7 +209,7 @@ export const useAppStore = create<AppStore>()(
             ...state.materials,
             { ...payload, id, createdAt: nowIso(), updatedAt: nowIso(), deletedAt: null, userId: state.user?.id }
           ],
-          syncStatus: "idle"
+          ...getOfflineSyncState(get().settings.cloudSyncEnabled, get().pendingOfflineChanges)
         }));
         return id;
       },
@@ -210,13 +219,13 @@ export const useAppStore = create<AppStore>()(
           const target = state.studyTasks.find((task) => task.id === id);
           const wasDone = target?.status === "done";
           const studyTasks = state.studyTasks.map((task) => (task.id === id ? touch({ ...task, status }) : task));
-          if (!target || status !== "done" || wasDone) return { studyTasks, syncStatus: "idle" };
+          if (!target || status !== "done" || wasDone) return { studyTasks, ...getOfflineSyncState(get().settings.cloudSyncEnabled, get().pendingOfflineChanges) };
           const reward = xpForTask(target.duration, target.type);
           const stats = withBadges(state.exams, studyTasks, awardXp(state.stats, reward));
           return {
             studyTasks,
             stats,
-            syncStatus: "idle",
+            ...getOfflineSyncState(get().settings.cloudSyncEnabled, get().pendingOfflineChanges),
             rewardToast: { amount: reward, reason: "Lernaufgabe abgeschlossen", at: Date.now() }
           };
         }),
@@ -229,7 +238,7 @@ export const useAppStore = create<AppStore>()(
               .map((task) => ({ ...task, userId: state.user?.id, updatedAt: nowIso(), deletedAt: null }))
           );
           const preserved = state.studyTasks.filter((task) => task.status === "done" || (examId ? task.examId !== examId : false));
-          return { studyTasks: [...preserved, ...regenerated], syncStatus: "idle" };
+          return { studyTasks: [...preserved, ...regenerated], ...getOfflineSyncState(get().settings.cloudSyncEnabled, get().pendingOfflineChanges) };
         }),
 
       redistributeMissed: () =>
@@ -238,7 +247,7 @@ export const useAppStore = create<AppStore>()(
             state.studyTasks,
             new Map(filterActive(state.exams).map((exam) => [exam.id, exam]))
           ).map((task) => touch(task)),
-          syncStatus: "idle"
+          ...getOfflineSyncState(get().settings.cloudSyncEnabled, get().pendingOfflineChanges)
         })),
 
       addFocusSession: (minutes, completed = true) =>
@@ -267,7 +276,7 @@ export const useAppStore = create<AppStore>()(
           );
           return {
             stats,
-            syncStatus: "idle",
+            ...getOfflineSyncState(get().settings.cloudSyncEnabled, get().pendingOfflineChanges),
             rewardToast: { amount: reward, reason: "Fokus-Session", at: Date.now() }
           };
         }),
@@ -319,7 +328,7 @@ export const useAppStore = create<AppStore>()(
           user: null,
           isAuthenticated: false,
           authReady: true,
-          syncStatus: "idle",
+          ...getOfflineSyncState(get().settings.cloudSyncEnabled, get().pendingOfflineChanges),
           lastSyncedAt: undefined,
           syncError: undefined,
           settings: { ...get().settings, cloudSyncEnabled: false }
@@ -331,7 +340,7 @@ export const useAppStore = create<AppStore>()(
         if (!state.user || !state.isAuthenticated) throw new Error("Nicht eingeloggt.");
         if (!state.settings.cloudSyncEnabled) throw new Error("Cloud Sync ist deaktiviert.");
         if (!get().isOnline) {
-          set({ syncStatus: "error", syncError: "Offline. Sync wird fortgesetzt, sobald eine Verbindung besteht." });
+          set({ syncStatus: "pending_offline", syncError: "Offline. Sync wird fortgesetzt, sobald eine Verbindung besteht." });
           return;
         }
 
@@ -364,7 +373,8 @@ export const useAppStore = create<AppStore>()(
             stats,
             syncStatus: "success",
             lastSyncedAt: nowIso(),
-            syncError: undefined
+            syncError: undefined,
+            pendingOfflineChanges: false
           });
         } catch (error) {
           const message = error instanceof Error ? error.message : "Unbekannter Sync-Fehler";
