@@ -70,7 +70,7 @@ export const seedSnapshot: AppSnapshot = {
       id: "mat-video-bio",
       examId: "exam-bio",
       type: "video",
-      title: "DNA-Replikation erklaert",
+      title: "DNA-Replikation erklärt",
       url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),

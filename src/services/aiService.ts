@@ -1,5 +1,5 @@
 import type { CoachMessage, Flashcard, QuizQuestion, StudyTask, Topic, UserStats } from "../types";
-import { supabase } from "../lib/supabase";
+import { getSupabaseRequestHeaders, supabase, supabaseAnonKey } from "../lib/supabase";
 
 type AiAction = "generateQuiz" | "generateFlashcards" | "optimizeStudyPlan" | "coachMessage" | "coachChat";
 type AiSource = "glm" | "deepseek" | "mock";
@@ -8,8 +8,7 @@ export interface CoachChatMessage {
   role: "user" | "assistant";
   content: string;
 }
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
 
 export interface AiResult<T> {
   data: T;
@@ -41,7 +40,7 @@ async function mockGenerateQuiz(topics: Topic[]): Promise<QuizQuestion[]> {
     options: [
       `Definition von ${topic.name}`,
       `${topic.name} in einer Beispielaufgabe`,
-      `Hauefiger Fehler bei ${topic.name}`,
+      `Häufiger Fehler bei ${topic.name}`,
       `Zusammenhang von ${topic.name} mit dem Gesamtstoff`
     ],
     answer: index % 2 === 0 ? `Definition von ${topic.name}` : `${topic.name} in einer Beispielaufgabe`
@@ -52,8 +51,8 @@ async function mockGenerateFlashcards(topics: Topic[]): Promise<Flashcard[]> {
   await sleep(300);
   return topics.slice(0, 6).map((topic) => ({
     id: `flashcard-${topic.id}`,
-    front: `Erklaere ${topic.name} in 2 Saetzen.`,
-    back: `${topic.name} ist ein Schwerpunkt mit geschaetztem Aufwand von ${topic.estimatedMinutes} Minuten.`
+    front: `Erkläre ${topic.name} in 2 Sätzen.`,
+    back: `${topic.name} ist ein Schwerpunkt mit geschätztem Aufwand von ${topic.estimatedMinutes} Minuten.`
   }));
 }
 
@@ -139,20 +138,15 @@ async function invokeAiCoach<T>(
 ): Promise<AiResult<T>> {
   try {
     if (!supabase) throw new Error("Supabase ist nicht konfiguriert.");
-    if (!supabaseUrl) throw new Error("Supabase URL fehlt. KI nutzt den Mock-Fallback.");
     if (!supabaseAnonKey) throw new Error("Supabase Anon Key fehlt. KI nutzt den Mock-Fallback.");
 
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError) throw sessionError;
     const accessToken = sessionData.session?.access_token;
 
-    if (import.meta.env.DEV) {
-      console.debug("AI auth header present", Boolean(accessToken));
-    }
-
     const { data, error } = await supabase.functions.invoke("ai-coach", {
       body: { action, payload },
-      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined
+      headers: getSupabaseRequestHeaders(accessToken)
     });
 
     if (error) throw error;
@@ -171,7 +165,7 @@ export async function optimizeStudyPlanWithAiResult(tasks: StudyTask[]): Promise
     { tasks },
     (value) => {
       const tasksResult = (value as { tasks?: unknown })?.tasks;
-      if (!isStudyTasks(tasksResult)) throw new Error("Ungueltige KI-Antwort fuer Lernplan.");
+      if (!isStudyTasks(tasksResult)) throw new Error("Ungültige KI-Antwort für Lernplan.");
       return tasksResult;
     },
     () => mockOptimizeStudyPlan(tasks)
@@ -184,7 +178,7 @@ export async function generateQuizFromTopicsResult(topics: Topic[]): Promise<AiR
     { topics },
     (value) => {
       const questions = (value as { questions?: unknown })?.questions;
-      if (!isQuizQuestions(questions)) throw new Error("Ungueltige KI-Antwort fuer Quiz.");
+      if (!isQuizQuestions(questions)) throw new Error("Ungültige KI-Antwort für Quiz.");
       return questions;
     },
     () => mockGenerateQuiz(topics)
@@ -197,7 +191,7 @@ export async function generateFlashcardsFromTopicsResult(topics: Topic[]): Promi
     { topics },
     (value) => {
       const flashcards = (value as { flashcards?: unknown })?.flashcards;
-      if (!isFlashcards(flashcards)) throw new Error("Ungueltige KI-Antwort fuer Flashcards.");
+      if (!isFlashcards(flashcards)) throw new Error("Ungültige KI-Antwort für Flashcards.");
       return flashcards;
     },
     () => mockGenerateFlashcards(topics)
@@ -209,7 +203,7 @@ export async function getCoachMessageResult(stats: UserStats, tasks: StudyTask[]
     "coachMessage",
     { stats, tasks },
     (value) => {
-      if (!isCoachMessage(value)) throw new Error("Ungueltige KI-Antwort fuer Coach.");
+      if (!isCoachMessage(value)) throw new Error("Ungültige KI-Antwort für Coach.");
       return value;
     },
     () => mockCoachMessage(stats, tasks)
@@ -228,14 +222,14 @@ export async function sendCoachChatResult(
     { mode, messages, context },
     (value) => {
       const message = (value as { message?: unknown })?.message;
-      if (typeof message !== "string") throw new Error("Ungueltige KI-Antwort fuer Coach-Chat.");
+      if (typeof message !== "string") throw new Error("Ungültige KI-Antwort für Coach-Chat.");
       return { message };
     },
     async () => ({
       message: isGreeting
-        ? "Hi. Wobei soll ich dir helfen: Thema erklaeren, Quiz abfragen, Flashcards erstellen oder den heutigen Lernplan sortieren?"
+        ? "Hi. Wobei soll ich dir helfen: Thema erklären, Quiz abfragen, Flashcards erstellen oder den heutigen Lernplan sortieren?"
         : lastUserMessage
-        ? `Ich kann den KI-Provider gerade nicht erreichen. Fuer "${lastUserMessage}" starte mit drei Punkten: Kernbegriffe sammeln, eine Beispielaufgabe loesen, offene Fragen notieren.`
+        ? `Ich kann den KI-Provider gerade nicht erreichen. Für "${lastUserMessage}" starte mit drei Punkten: Kernbegriffe sammeln, eine Beispielaufgabe lösen, offene Fragen notieren.`
         : "Ich kann den KI-Provider gerade nicht erreichen. Starte mit einer kurzen Wiederholung und formuliere danach eine konkrete Frage."
     })
   );

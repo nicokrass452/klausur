@@ -28,7 +28,7 @@ export function SyncStatusBadge() {
     return (
       <div className="hidden items-center gap-2 rounded-xl border border-cyan-200 bg-cyan-50 px-2.5 py-1.5 text-xs font-semibold text-cyan-700 sm:inline-flex dark:border-cyan-900/60 dark:bg-cyan-950/40 dark:text-cyan-300">
         <CloudCog size={15} />
-        Sync laeuft
+        Sync läuft
       </div>
     );
   }

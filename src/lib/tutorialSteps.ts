@@ -27,9 +27,9 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     id: "welcome",
     route: ROUTES.dashboard,
     title: "Willkommen bei Klausurplaner",
-    summary: "Dein persoenlicher Lernplaner fuer Klausuren – online mit Cloud-Sync, KI-Coach und Gamification.",
+    summary: "Dein persönlicher Lernplaner für Klausuren – online mit Cloud-Sync, KI-Coach und Gamification.",
     details: [
-      "Diese Einfuehrung zeigt dir alle Bereiche der App Schritt fuer Schritt.",
+      "Diese Einführung zeigt dir alle Bereiche der App Schritt für Schritt.",
       "Du musst jeden Schritt durchklicken, bevor die App freigeschaltet wird.",
       "Ohne Login kannst du nur den Kalender ansehen – mit Account sind alle Funktionen aktiv."
     ],
@@ -38,13 +38,13 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: "dashboard",
     route: ROUTES.dashboard,
-    title: "Dashboard – dein Ueberblick",
+    title: "Dashboard – dein Überblick",
     summary: "Hier siehst du Countdown, heutige Aufgaben, Streak und Fortschritt auf einen Blick.",
     details: [
-      "Die grosse Karte zeigt deine naechste Klausur mit Countdown in Tagen.",
-      "Der Lerncoach gibt dir taeglich eine kurze Empfehlung basierend auf deinem Plan.",
+      "Die große Karte zeigt deine nächste Klausur mit Countdown in Tagen.",
+      "Der Lerncoach gibt dir täglich eine kurze Empfehlung basierend auf deinem Plan.",
       "Unter „Heute lernen“ findest du offene Aufgaben – abhaken bringt XP.",
-      "Die Stat-Karten zeigen Streak, Fokuszeit und offene Aufgaben fuer heute."
+      "Die Stat-Karten zeigen Streak, Fokuszeit und offene Aufgaben für heute."
     ],
     icon: LayoutDashboard
   },
@@ -52,11 +52,11 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     id: "exams",
     route: ROUTES.exams,
     title: "Klausuren anlegen",
-    summary: "Lege Faecher mit Datum, Schwierigkeit und Wissensstand an – der Lernplan wird automatisch erzeugt.",
+    summary: "Lege Fächer mit Datum, Schwierigkeit und Wissensstand an – der Lernplan wird automatisch erzeugt.",
     details: [
-      "Trage Fach, Datum, Uhrzeit, Raum und taegliche Lernzeit ein.",
-      "Schwierigkeit (1–5) und Wissensstand beeinflussen die Prioritaet im Lernplan.",
-      "Nach dem Speichern oeffnest du die Klausur fuer Themen, Material und KI-Hilfe.",
+      "Trage Fach, Datum, Uhrzeit, Raum und tägliche Lernzeit ein.",
+      "Schwierigkeit (1–5) und Wissensstand beeinflussen die Priorität im Lernplan.",
+      "Nach dem Speichern öffnest du die Klausur für Themen, Material und KI-Hilfe.",
       "Jede Klausur bekommt eine eigene Farbe im Kalender."
     ],
     icon: BookOpenText
@@ -67,7 +67,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     title: "Lernplan mit Spaced Repetition",
     summary: "Aufgaben werden automatisch verteilt: 70 % lernen, 20 % wiederholen, 10 % Puffer.",
     details: [
-      "Der Plan nutzt Intervalle an Tag 1, 2, 5, 10 und 18 fuer Wiederholungen.",
+      "Der Plan nutzt Intervalle an Tag 1, 2, 5, 10 und 18 für Wiederholungen.",
       "„Verpasste neu verteilen“ schiebt offene Aufgaben auf kommende Tage.",
       "KI-Plan optimieren, Quiz und Flashcards erzeugen Lernhilfen aus deinen Themen.",
       "Erledigte Aufgaben geben XP – verpasste kannst du markieren."
@@ -81,8 +81,8 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     summary: "Sieh Klausuren in Wochen- oder Monatsansicht mit Fachfarben.",
     details: [
       "Wechsle oben zwischen Woche und Monat.",
-      "Jede Klausur erscheint am Pruefungstag in der Fachfarbe.",
-      "Nutze den Kalender, um Lernphasen und Pruefungstermine zu planen."
+      "Jede Klausur erscheint am Prüfungstag in der Fachfarbe.",
+      "Nutze den Kalender, um Lernphasen und Prüfungstermine zu planen."
     ],
     icon: CalendarDays
   },
@@ -90,12 +90,12 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     id: "coach",
     route: ROUTES.coach,
     title: "AI Trainer",
-    summary: "Chat mit KI in fuenf Modi: Coach, Quiz, Flashcards, Plan und Erklaeren.",
+    summary: "Chat mit KI in fünf Modi: Coach, Quiz, Flashcards, Plan und Erklären.",
     details: [
       "Der Coach kennt deine Klausuren, Themen und offenen Aufgaben als Kontext.",
       "Quiz und Flashcards werden als interaktive Karten im Chat angezeigt.",
-      "GLM und DeepSeek laufen ueber Supabase – dein Account schaltet die KI frei.",
-      "Waehle links den Modus und stelle Fragen zum aktuellen Lernstoff."
+      "GLM und DeepSeek laufen über Supabase – dein Account schaltet die KI frei.",
+      "Wähle links den Modus und stelle Fragen zum aktuellen Lernstoff."
     ],
     icon: Bot
   },
@@ -103,11 +103,11 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     id: "focus",
     route: ROUTES.focus,
     title: "Fokusmodus (Pomodoro)",
-    summary: "25 Minuten konzentriert lernen, 5 Minuten Pause – XP fuer abgeschlossene Sessions.",
+    summary: "25 Minuten konzentriert lernen, 5 Minuten Pause – XP für abgeschlossene Sessions.",
     details: [
-      "Starte den Timer fuer eine Pomodoro-Einheit.",
-      "Abgeschlossene Sessions erhoehen deine Fokuszeit und bringen XP.",
-      "Ideal fuer freie Wiederholung, wenn heute keine Aufgaben im Plan stehen."
+      "Starte den Timer für eine Pomodoro-Einheit.",
+      "Abgeschlossene Sessions erhöhen deine Fokuszeit und bringen XP.",
+      "Ideal für freie Wiederholung, wenn heute keine Aufgaben im Plan stehen."
     ],
     icon: Clock3
   },
@@ -115,10 +115,10 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     id: "analytics",
     route: ROUTES.analytics,
     title: "Analytics",
-    summary: "Lernzeit, XP-Verlauf, schwaechstes Fach und freigeschaltete Badges.",
+    summary: "Lernzeit, XP-Verlauf, schwächstes Fach und freigeschaltete Badges.",
     details: [
       "Sieh, wie viel Zeit du pro Fach investiert hast.",
-      "Das schwaechste Fach wird aus Themenfortschritt berechnet.",
+      "Das schwächste Fach wird aus Themenfortschritt berechnet.",
       "XP-Verlauf und Badges motivieren dich langfristig dranzubleiben."
     ],
     icon: BarChart3
@@ -130,9 +130,9 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     summary: "Theme, Erinnerungen, Standard-Lernzeit und optionaler Cloud Sync.",
     details: [
       "Wechsle zwischen Hell, Dunkel und System-Theme.",
-      "Aktiviere Push-Benachrichtigungen fuer taegliche Lernreminder.",
-      "Cloud Sync mit Google Login synchronisiert Daten zwischen Geraeten.",
-      "Die Einfuehrung kannst du hier jederzeit erneut starten."
+      "Aktiviere Push-Benachrichtigungen für tägliche Lernreminder.",
+      "Cloud Sync mit Google Login synchronisiert Daten zwischen Geräten.",
+      "Die Einführung kannst du hier jederzeit erneut starten."
     ],
     icon: Settings2
   },
@@ -143,7 +143,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     summary: "Lernen wird belohnt – Aufgaben, Themen und Fokus-Sessions bringen XP.",
     details: [
       "XP-Badge oben rechts zeigt Level und gesammelte Erfahrungspunkte.",
-      "Streak zaehlt aufeinanderfolgende Lerntage.",
+      "Streak zählt aufeinanderfolgende Lerntage.",
       "Badges wie „Fokusstart“ oder „7er Streak“ schaltest du durch Nutzung frei.",
       "Toast-Benachrichtigungen erscheinen, wenn du XP erhältst."
     ],
@@ -155,9 +155,9 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     title: "Bereit zum Lernen!",
     summary: "Du kennst jetzt alle Funktionen. Leg los – oder passe die Demo-Klausuren an.",
     details: [
-      "Die App startet mit Beispiel-Klausuren (Mathe & Biologie) – bearbeite oder loesche sie.",
+      "Die App startet mit Beispiel-Klausuren (Mathe & Biologie) – bearbeite oder lösche sie.",
       "Erstelle deine erste eigene Klausur unter „Klausuren“.",
-      "Viel Erfolg bei der naechsten Pruefung!"
+      "Viel Erfolg bei der nächsten Prüfung!"
     ],
     icon: Trophy
   }

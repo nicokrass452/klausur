@@ -50,3 +50,85 @@ button {
   background-color: rgba(20, 184, 166, 0.25);
   color: #0f172a;
 }
+
+.progress-track {
+  background: linear-gradient(180deg, rgb(241 245 249 / 0.95), rgb(226 232 240 / 0.9));
+  box-shadow: inset 0 1px 2px rgb(15 23 42 / 0.08);
+}
+
+:root[data-theme="dark"] .progress-track {
+  background: linear-gradient(180deg, rgb(30 41 59 / 0.9), rgb(15 23 42 / 0.95));
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.35);
+}
+
+.nav-bar {
+  border-radius: 1.25rem;
+  border: 1px solid rgb(226 232 240 / 0.95);
+  background: rgb(255 255 255 / 0.94);
+  box-shadow: 0 12px 40px rgb(15 23 42 / 0.12);
+  backdrop-filter: blur(16px);
+}
+
+:root[data-theme="dark"] .nav-bar {
+  border-color: rgb(51 65 85 / 0.9);
+  background: rgb(15 23 42 / 0.94);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.35);
+}
+
+.nav-pill__indicator {
+  position: absolute;
+  top: 0.35rem;
+  left: 50%;
+  height: 0.2rem;
+  width: 1.25rem;
+  transform: translateX(-50%);
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #14b8a6, #06b6d4);
+}
+
+.nav-pill--active {
+  background: rgb(20 184 166 / 0.1);
+}
+
+.segmented-control {
+  display: inline-flex;
+  gap: 0.25rem;
+  border-radius: 0.875rem;
+  border: 1px solid rgb(226 232 240 / 0.95);
+  background: rgb(248 250 252 / 0.95);
+  padding: 0.25rem;
+}
+
+:root[data-theme="dark"] .segmented-control {
+  border-color: rgb(51 65 85 / 0.9);
+  background: rgb(15 23 42 / 0.85);
+}
+
+.segmented-control__item {
+  border-radius: 0.625rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: rgb(100 116 139);
+  transition: color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.segmented-control__item:hover {
+  color: rgb(51 65 85);
+}
+
+:root[data-theme="dark"] .segmented-control__item:hover {
+  color: rgb(226 232 240);
+}
+
+.segmented-control__item--active {
+  background: rgb(15 23 42);
+  color: white;
+  box-shadow: 0 4px 14px rgb(15 23 42 / 0.18);
+}
+
+:root[data-theme="dark"] .segmented-control__item--active {
+  background: rgb(20 184 166);
+  color: rgb(15 23 42);
+  box-shadow: 0 4px 14px rgb(20 184 166 / 0.25);
+}

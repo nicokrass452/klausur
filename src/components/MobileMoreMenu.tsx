@@ -7,24 +7,25 @@ export function MobileMoreMenu() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="relative">
+    <div className="relative flex-1">
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className={`flex min-h-14 flex-1 flex-col items-center justify-center rounded-2xl px-2 text-[11px] font-semibold ${
-          open ? "bg-slate-950 text-white dark:bg-teal-500 dark:text-slate-950" : "text-slate-500"
+        className={`nav-pill relative flex min-h-14 w-full flex-col items-center justify-center rounded-2xl px-1 text-[11px] font-semibold transition ${
+          open ? "nav-pill--active text-teal-700 dark:text-teal-300" : "text-slate-500"
         }`}
         aria-expanded={open}
         aria-haspopup="menu"
       >
+        {open ? <span className="nav-pill__indicator" aria-hidden /> : null}
         <MoreHorizontal size={18} />
         <span className="mt-1">Mehr</span>
       </button>
 
       {open ? (
         <>
-          <button type="button" className="fixed inset-0 z-40" aria-label="Menue schliessen" onClick={() => setOpen(false)} />
-          <div className="absolute bottom-[calc(100%+0.5rem)] right-0 z-50 min-w-44 rounded-2xl border border-white/60 bg-white/95 p-2 shadow-panel backdrop-blur-lg dark:border-slate-800 dark:bg-slate-950/95">
+          <button type="button" className="fixed inset-0 z-40" aria-label="Menü schließen" onClick={() => setOpen(false)} />
+          <div className="nav-bar absolute bottom-[calc(100%+0.5rem)] right-0 z-50 min-w-48 p-2">
             {SECONDARY_NAV_ITEMS.map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
@@ -33,7 +34,7 @@ export function MobileMoreMenu() {
                 className={({ isActive }) =>
                   `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium ${
                     isActive
-                      ? "bg-slate-950 text-white dark:bg-teal-500 dark:text-slate-950"
+                      ? "bg-teal-500/15 text-teal-700 dark:text-teal-300"
                       : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900"
                   }`
                 }

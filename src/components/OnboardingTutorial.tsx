@@ -41,7 +41,7 @@ export function OnboardingTutorial() {
       <div className="w-full max-w-lg rounded-[32px] border border-white/20 bg-white p-6 shadow-panel dark:border-slate-700 dark:bg-slate-900">
         <div className="flex items-center justify-between gap-4">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-            Einfuehrung {stepIndex + 1} / {TUTORIAL_STEPS.length}
+            Einführung {stepIndex + 1} / {TUTORIAL_STEPS.length}
           </p>
           <div className="flex gap-1">
             {TUTORIAL_STEPS.map((entry, index) => (
@@ -79,7 +79,7 @@ export function OnboardingTutorial() {
             className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-40 dark:border-slate-700 dark:text-slate-200"
           >
             <ChevronLeft size={16} />
-            Zurueck
+            Zurück
           </button>
           <button
             type="button"

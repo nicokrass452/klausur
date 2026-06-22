@@ -8,7 +8,7 @@ const modes: Array<{ id: CoachChatMode; label: string; icon: typeof Sparkles }> 
   { id: "quiz", label: "Quiz", icon: Brain },
   { id: "flashcards", label: "Flashcards", icon: Layers3 },
   { id: "plan", label: "Plan", icon: ClipboardList },
-  { id: "explain", label: "Erklaeren", icon: GraduationCap }
+  { id: "explain", label: "Erklären", icon: GraduationCap }
 ];
 
 function sourceLabel(source: "glm" | "deepseek" | "mock"): string {

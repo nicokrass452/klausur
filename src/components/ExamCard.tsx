@@ -28,7 +28,7 @@ export function ExamCard({ exam, topics }: ExamCardProps) {
         </span>
       </div>
       <div className="mt-5">
-        <ProgressBar value={progress} />
+        <ProgressBar value={progress} showValue />
       </div>
       <p className="mt-4 text-sm text-slate-500">{topics.filter((topic) => topic.examId === exam.id).length} Themen erfasst</p>
     </Link>

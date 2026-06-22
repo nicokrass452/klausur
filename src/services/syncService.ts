@@ -1,4 +1,5 @@
 import type { Session, User } from "@supabase/supabase-js";
+import { formatSupabaseError } from "../lib/supabaseErrors";
 import { getAuthRedirectUrl, supabase } from "../lib/supabase";
 import type { AppSnapshot, Exam, FocusSession, StudyMaterial, StudyTask, Topic, UserBadge, UserProfile, UserStats } from "../types";
 
@@ -18,6 +19,14 @@ function requireSupabase() {
     throw new Error("Supabase ist nicht konfiguriert. Trage VITE_SUPABASE_URL und VITE_SUPABASE_ANON_KEY ein.");
   }
   return supabase;
+}
+
+function isMissingRowError(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && (error as { code?: string }).code === "PGRST116");
+}
+
+function throwIfSupabaseError(error: unknown): void {
+  if (error) throw new Error(formatSupabaseError(error));
 }
 
 function mapUserToProfile(user: User): UserProfile {
@@ -222,34 +231,80 @@ export async function signInWithGoogle(): Promise<void> {
       }
     }
   });
-  if (error) throw error;
+  throwIfSupabaseError(error);
+}
+
+function mapAuthError(error: { message: string }): Error {
+  const message = error.message.toLowerCase();
+  if (message.includes("api key") || message.includes("apikey")) {
+    return new Error(formatSupabaseError(error));
+  }
+  if (message.includes("email not confirmed")) {
+    return new Error("Bitte bestätige zuerst deine E-Mail-Adresse in Supabase.");
+  }
+  if (message.includes("invalid login credentials") || message.includes("invalid credentials")) {
+    return new Error("E-Mail oder Passwort ist falsch.");
+  }
+  const friendly = formatSupabaseError(error);
+  return new Error(friendly === "Supabase-Anfrage fehlgeschlagen" ? error.message : friendly);
 }
 
 export async function signInWithEmail(email: string, password: string): Promise<void> {
   const client = requireSupabase();
   const { error } = await client.auth.signInWithPassword({ email, password });
-  if (!error) return;
-  const signUp = await client.auth.signUp({ email, password });
-  if (signUp.error) throw signUp.error;
+  if (error) throw mapAuthError(error);
+}
+
+export async function signUpWithEmail(
+  email: string,
+  password: string
+): Promise<{ needsEmailConfirmation: boolean }> {
+  const client = requireSupabase();
+  const { data, error } = await client.auth.signUp({ email, password });
+  if (error) throw mapAuthError(error);
+  return { needsEmailConfirmation: Boolean(data.user && !data.session) };
 }
 
 export async function signOut(): Promise<void> {
   const client = requireSupabase();
-  const { error } = await client.auth.signOut();
-  if (error) throw error;
+  const { error } = await client.auth.signOut({ scope: "global" });
+  throwIfSupabaseError(error);
+}
+
+/** Validates the current session with Supabase — stale or deleted users are cleared. */
+export async function resolveAuthUser(): Promise<UserProfile | null> {
+  const client = requireSupabase();
+  const { data, error } = await client.auth.getUser();
+  if (error || !data.user) {
+    await client.auth.signOut({ scope: "local" });
+    return null;
+  }
+  return mapUserToProfile(data.user);
 }
 
 export async function getSession(): Promise<Session | null> {
   const client = requireSupabase();
   const { data, error } = await client.auth.getSession();
-  if (error) throw error;
+  throwIfSupabaseError(error);
   return data.session;
 }
 
 export function onAuthStateChange(callback: (session: Session | null, profile: UserProfile | null) => void) {
   const client = requireSupabase();
-  const { data } = client.auth.onAuthStateChange((_event, session) => {
-    callback(session, session?.user ? mapUserToProfile(session.user) : null);
+  const { data } = client.auth.onAuthStateChange(async (event, session) => {
+    if (event === "SIGNED_OUT" || !session) {
+      callback(null, null);
+      return;
+    }
+
+    const { data: userData, error } = await client.auth.getUser();
+    if (error || !userData.user) {
+      await client.auth.signOut({ scope: "local" });
+      callback(null, null);
+      return;
+    }
+
+    callback(session, mapUserToProfile(userData.user));
   });
   return () => data.subscription.unsubscribe();
 }
@@ -272,7 +327,7 @@ export async function ensureProfile(user: UserProfile): Promise<UserProfile> {
     )
     .select("*")
     .single();
-  if (error) throw error;
+  throwIfSupabaseError(error);
   return {
     id: data.id,
     email: data.email ?? undefined,
@@ -299,7 +354,7 @@ export function resolveConflicts<T extends { id: string; updatedAt: string; dele
 export async function pullFromCloud(userId: string): Promise<CloudBundle> {
   const client = requireSupabase();
   const [profiles, exams, topics, studyTasks, materials, stats, focusSessions, badges] = await Promise.all([
-    client.from("profiles").select("*").eq("id", userId).single(),
+    client.from("profiles").select("*").eq("id", userId).maybeSingle(),
     client.from("exams").select("*").eq("user_id", userId),
     client.from("topics").select("*").eq("user_id", userId),
     client.from("study_tasks").select("*").eq("user_id", userId),
@@ -308,6 +363,12 @@ export async function pullFromCloud(userId: string): Promise<CloudBundle> {
     client.from("focus_sessions").select("*").eq("user_id", userId),
     client.from("badges").select("*").eq("user_id", userId)
   ]);
+
+  [profiles, exams, topics, studyTasks, materials, stats, focusSessions, badges].forEach((result) => {
+    if (result.error && !isMissingRowError(result.error)) {
+      throwIfSupabaseError(result.error);
+    }
+  });
 
   return {
     user: profiles.data
@@ -349,19 +410,19 @@ export async function pullFromCloud(userId: string): Promise<CloudBundle> {
 export async function syncExam(exam: Exam, userId: string): Promise<void> {
   const client = requireSupabase();
   const { error } = await client.from("exams").upsert(mapExamToRow(exam, userId), { onConflict: "id" });
-  if (error) throw error;
+  throwIfSupabaseError(error);
 }
 
 export async function syncTopic(topic: Topic, userId: string): Promise<void> {
   const client = requireSupabase();
   const { error } = await client.from("topics").upsert(mapTopicToRow(topic, userId), { onConflict: "id" });
-  if (error) throw error;
+  throwIfSupabaseError(error);
 }
 
 export async function syncStudyTask(task: StudyTask, userId: string): Promise<void> {
   const client = requireSupabase();
   const { error } = await client.from("study_tasks").upsert(mapTaskToRow(task, userId), { onConflict: "id" });
-  if (error) throw error;
+  throwIfSupabaseError(error);
 }
 
 export async function syncUserStats(stats: UserStats, focusSessions: FocusSession[], badges: UserBadge[], userId: string): Promise<void> {
@@ -380,20 +441,20 @@ export async function syncUserStats(stats: UserStats, focusSessions: FocusSessio
     },
     { onConflict: "user_id" }
   );
-  if (error) throw error;
+  throwIfSupabaseError(error);
 
   if (focusSessions.length) {
     const focusError = await client.from("focus_sessions").upsert(focusSessions.map((entry) => mapFocusSessionToRow(entry, userId)), { onConflict: "id" });
-    if (focusError.error) throw focusError.error;
+    throwIfSupabaseError(focusError.error);
   }
   if (badges.length) {
     const badgeError = await client.from("badges").upsert(badges.map((entry) => mapBadgeToRow(entry, userId)), { onConflict: "id" });
-    if (badgeError.error) throw badgeError.error;
+    throwIfSupabaseError(badgeError.error);
   }
 }
 
 export async function pushToCloud(snapshot: AppSnapshot): Promise<void> {
-  if (!snapshot.user) throw new Error("Kein eingeloggter Nutzer fuer Cloud Sync.");
+  if (!snapshot.user) throw new Error("Kein eingeloggter Nutzer für Cloud Sync.");
   const client = requireSupabase();
   const userId = snapshot.user.id;
 
@@ -408,7 +469,7 @@ export async function pushToCloud(snapshot: AppSnapshot): Promise<void> {
 
   const results = await Promise.all(operations);
   results.forEach((result) => {
-    if (result.error) throw result.error;
+    throwIfSupabaseError(result.error);
   });
 
   await syncUserStats(snapshot.stats, snapshot.stats.focusSessions, snapshot.stats.badges, userId);

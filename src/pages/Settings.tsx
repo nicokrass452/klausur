@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { SegmentedControl } from "../components/SegmentedControl";
 import { ROUTES } from "../lib/constants";
 import { requestNotificationPermission } from "../services/notificationService";
 import { useAppStore } from "../store/useAppStore";
@@ -22,21 +23,21 @@ export function SettingsPage() {
     <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
       <section className="rounded-[32px] border border-white/50 bg-white/80 p-6 shadow-panel dark:border-slate-800 dark:bg-slate-900/80">
         <h3 className="font-display text-2xl text-slate-950 dark:text-white">Darstellung</h3>
-        <div className="mt-5 flex flex-wrap gap-3">
-          {(["light", "dark", "system"] as const).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => setTheme(mode)}
-              className={`rounded-full px-4 py-3 text-sm font-semibold ${settings.theme === mode ? "bg-slate-950 text-white dark:bg-teal-500 dark:text-slate-950" : "border border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"}`}
-            >
-              {mode}
-            </button>
-          ))}
+        <div className="mt-5">
+          <SegmentedControl
+            value={settings.theme}
+            onChange={setTheme}
+            options={[
+              { value: "light", label: "Hell" },
+              { value: "dark", label: "Dunkel" },
+              { value: "system", label: "System" }
+            ]}
+          />
         </div>
 
-        <h3 className="mt-8 font-display text-2xl text-slate-950 dark:text-white">Einfuehrung</h3>
+        <h3 className="mt-8 font-display text-2xl text-slate-950 dark:text-white">Einführung</h3>
         <p className="mt-2 text-sm text-slate-500">
-          {settings.tutorialCompleted ? "Du hast die Einfuehrung abgeschlossen." : "Die Einfuehrung wird beim naechsten Seitenaufruf angezeigt."}
+          {settings.tutorialCompleted ? "Du hast die Einführung abgeschlossen." : "Die Einführung wird beim nächsten Seitenaufruf angezeigt."}
         </p>
         <button
           onClick={() => {
@@ -45,13 +46,13 @@ export function SettingsPage() {
           }}
           className="mt-4 rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
         >
-          Einfuehrung erneut starten
+          Einführung erneut starten
         </button>
 
         <h3 className="mt-8 font-display text-2xl text-slate-950 dark:text-white">Erinnerungen</h3>
         <div className="mt-5 space-y-4">
           <label className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/80 px-4 py-3 dark:border-slate-800">
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Taegliche Lernreminder</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Tägliche Lernreminder</span>
             <input type="checkbox" checked={settings.reminders.dailyReminder} onChange={(event) => updateReminderSettings({ dailyReminder: event.target.checked })} />
           </label>
           <label className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/80 px-4 py-3 dark:border-slate-800">

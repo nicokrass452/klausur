@@ -106,13 +106,12 @@ export function ExamDetailPage() {
               Lernplan neu erzeugen
             </button>
             <Link to={ROUTES.exams} onClick={() => removeExam(exam.id)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">
-              Loeschen
+              Löschen
             </Link>
           </div>
         </div>
         <div className="mt-5">
-          <ProgressBar value={progress} />
-          <p className="mt-2 text-sm text-slate-500">{progress}% Themenfortschritt</p>
+          <ProgressBar value={progress} label="Themenfortschritt" showValue />
         </div>
       </section>
 
@@ -122,7 +121,7 @@ export function ExamDetailPage() {
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">GLM Lernhilfe</p>
             <h4 className="mt-2 font-display text-2xl text-slate-950 dark:text-white">Quiz, Flashcards und Coach</h4>
             <p className="mt-2 text-sm text-slate-500">
-              Die Anfrage laeuft ueber Supabase Edge Functions. Wenn GLM nicht erreichbar ist, wird DeepSeek als Fallback genutzt.
+              Die Anfrage läuft über Supabase Edge Functions. Wenn GLM nicht erreichbar ist, wird DeepSeek als Fallback genutzt.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -237,7 +236,7 @@ export function ExamDetailPage() {
               <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950" type="number" min="10" step="5" value={estimatedMinutes} onChange={(event) => setEstimatedMinutes(Number(event.target.value))} />
             </div>
             <button className="rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white dark:bg-teal-500 dark:text-slate-950" type="submit">
-              Thema hinzufuegen
+              Thema hinzufügen
             </button>
           </form>
           <div className="mt-6">
@@ -294,7 +293,7 @@ export function ExamDetailPage() {
               />
               <div className="flex items-center gap-2 text-sm text-slate-500">
                 <Upload size={16} />
-                Dateien werden fuer spaeteren Viewer in IndexedDB gespeichert.
+                Dateien werden für späteren Viewer in IndexedDB gespeichert.
               </div>
             </label>
           </div>

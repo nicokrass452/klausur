@@ -5,7 +5,7 @@ import { useNotifications } from "./hooks/useNotifications";
 import { useTheme } from "./hooks/useTheme";
 import { hasSupabaseEnv } from "./lib/supabase";
 import { AppRouter } from "./routes/AppRouter";
-import { getSession, onAuthStateChange } from "./services/syncService";
+import { onAuthStateChange, resolveAuthUser } from "./services/syncService";
 import { useAppStore } from "./store/useAppStore";
 
 export default function App() {
@@ -26,23 +26,8 @@ export default function App() {
       return;
     }
 
-    void getSession()
-      .then((session) => {
-        setAuthSession(
-          session?.user
-            ? {
-                id: session.user.id,
-                email: session.user.email,
-                fullName: (session.user.user_metadata.full_name as string | undefined) ?? (session.user.user_metadata.name as string | undefined),
-                avatarUrl: session.user.user_metadata.avatar_url as string | undefined,
-                provider: session.user.app_metadata.provider as string | undefined,
-                cloudSyncEnabled,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-              }
-            : null
-        );
-      })
+    void resolveAuthUser()
+      .then((profile) => setAuthSession(profile))
       .catch(() => setAuthSession(null));
 
     const unsubscribe = onAuthStateChange((_session, profile) => {
@@ -70,7 +55,7 @@ export default function App() {
   }, [isAuthenticated, cloudSyncEnabled, syncNow]);
 
   if (!hydrated || !authReady) {
-    return <div className="grid min-h-screen place-items-center bg-slate-950 text-white">Klausurplaner laedt...</div>;
+    return <div className="grid min-h-screen place-items-center bg-slate-950 text-white">Klausurplaner lädt...</div>;
   }
 
   return (

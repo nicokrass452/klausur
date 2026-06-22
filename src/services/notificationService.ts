@@ -24,7 +24,7 @@ export function syncNotificationSchedule(exams: Exam[], tasks: StudyTask[], sett
   });
 
   if (settings.reminders.dailyReminder) {
-    notifyOnce(`daily-${today}`, "Tagesziel", "Plane heute 25 Minuten Fokuszeit fuer deine wichtigsten Themen ein.", seen);
+    notifyOnce(`daily-${today}`, "Tagesziel", "Plane heute 25 Minuten Fokuszeit für deine wichtigsten Themen ein.", seen);
   }
 
   if (settings.reminders.todayLearningReminder) {

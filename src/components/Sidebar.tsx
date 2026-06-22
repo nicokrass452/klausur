@@ -14,7 +14,7 @@ export function Sidebar() {
         <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">Klausurplaner</p>
         <h1 className="mt-2 font-display text-2xl text-slate-950 dark:text-white">Lernen mit System</h1>
         <p className="mt-1 text-sm text-slate-500">
-          {isAuthenticated ? "Cloud-Sync, KI-Coach und persoenlicher Lernplan." : "Melde dich an, um alle Funktionen zu nutzen."}
+          {isAuthenticated ? "Cloud-Sync, KI-Coach und persönlicher Lernplan." : "Melde dich an, um alle Funktionen zu nutzen."}
         </p>
       </div>
 
@@ -40,13 +40,13 @@ export function Sidebar() {
       {!isAuthenticated ? (
         <div className="mt-auto rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/80">
           <p className="text-sm font-semibold text-slate-900 dark:text-white">Account erforderlich</p>
-          <p className="mt-1 text-sm text-slate-500">Lernplan, Coach und Statistiken sind nach dem Login verfuegbar.</p>
+          <p className="mt-1 text-sm text-slate-500">Lernplan, Coach und Statistiken sind nach dem Login verfügbar.</p>
           <NavLink
-            to={ROUTES.login}
+            to={ROUTES.signup}
             className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white dark:bg-teal-500 dark:text-slate-950"
           >
             <LogIn size={16} />
-            Anmelden
+            Registrieren
           </NavLink>
         </div>
       ) : null}

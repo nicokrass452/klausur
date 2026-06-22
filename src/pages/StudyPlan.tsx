@@ -16,7 +16,7 @@ export function StudyPlanPage() {
   const allTopics = useAppStore((state) => state.topics);
   const setTaskStatus = useAppStore((state) => state.setTaskStatus);
   const redistributeMissed = useAppStore((state) => state.redistributeMissed);
-  const [aiSummary, setAiSummary] = useState("Mock-Interfaces fuer KI-Optimierung, Quiz und Flashcards.");
+  const [aiSummary, setAiSummary] = useState("Mock-Interfaces für KI-Optimierung, Quiz und Flashcards.");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | undefined>();
 
@@ -54,7 +54,7 @@ export function StudyPlanPage() {
             className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white dark:bg-teal-500 dark:text-slate-950"
           >
             <WandSparkles size={16} />
-            {aiLoading ? "KI laedt..." : "KI-Plan optimieren"}
+            {aiLoading ? "KI lädt..." : "KI-Plan optimieren"}
           </button>
           <button
             onClick={async () => {

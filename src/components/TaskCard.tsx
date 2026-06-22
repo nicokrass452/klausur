@@ -26,7 +26,7 @@ export function TaskCard({ task, exam, onComplete, onMissed }: TaskCardProps) {
           className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400"
         >
           {task.status === "done" ? <CheckCircle2 size={16} /> : <Circle size={16} />}
-          {task.status === "done" ? "Erledigt" : "Abschliessen"}
+          {task.status === "done" ? "Erledigt" : "Abschließen"}
         </button>
         {onMissed ? (
           <button

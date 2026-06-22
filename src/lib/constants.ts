@@ -3,6 +3,7 @@ import type { UserBadge } from "../types";
 export const APP_NAME = "Klausurplaner";
 export const ROUTES = {
   login: "/login",
+  signup: "/signup",
   dashboard: "/dashboard",
   calendar: "/calendar",
   exams: "/exams",
@@ -22,6 +23,6 @@ export const POMODORO_BREAK_MINUTES = 5;
 export const BADGE_CATALOG: Array<Pick<UserBadge, "id" | "label" | "description">> = [
   { id: "first-focus", label: "Fokusstart", description: "Die erste Fokus-Session abgeschlossen." },
   { id: "ten-hours", label: "10h gelernt", description: "Mindestens 10 Stunden Lernzeit gesammelt." },
-  { id: "streak-7", label: "7er Streak", description: "Sieben Lerntage am Stueck erreicht." },
+  { id: "streak-7", label: "7er Streak", description: "Sieben Lerntage am Stück erreicht." },
   { id: "exam-master", label: "Klausur geschafft", description: "Eine Klausur komplett durchgeplant." }
 ];

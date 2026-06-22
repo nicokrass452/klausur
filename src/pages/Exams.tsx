@@ -62,7 +62,7 @@ export function ExamsPage() {
             <input className="w-full" type="range" min="1" max="5" value={knowledgeLevel} onChange={(event) => setKnowledgeLevel(Number(event.target.value))} />
           </label>
           <label className="space-y-2 text-sm font-medium text-slate-600 dark:text-slate-300 md:col-span-2">
-            Taegliche Lernzeit
+            Tägliche Lernzeit
             <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950" type="number" min="15" step="5" value={dailyMinutes} onChange={(event) => setDailyMinutes(Number(event.target.value))} />
           </label>
           <label className="space-y-2 text-sm font-medium text-slate-600 dark:text-slate-300 md:col-span-2">

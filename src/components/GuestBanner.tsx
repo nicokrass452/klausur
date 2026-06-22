@@ -12,16 +12,16 @@ export function GuestBanner() {
         <div>
           <p className="text-sm font-semibold text-slate-900 dark:text-white">Vorschaumodus</p>
           <p className="text-sm text-slate-600 dark:text-slate-300">
-            Du kannst Termine im Kalender ansehen. Fuer Lernplan, KI-Coach und Sync ist ein Account noetig.
+            Du kannst Termine im Kalender ansehen. Für Lernplan, KI-Coach und Sync ist ein Account nötig.
           </p>
         </div>
       </div>
       <Link
-        to={ROUTES.login}
+        to={ROUTES.signup}
         className="inline-flex shrink-0 items-center gap-2 rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white dark:bg-teal-500 dark:text-slate-950"
       >
         <LogIn size={16} />
-        Jetzt anmelden
+        Account erstellen
       </Link>
     </div>
   );

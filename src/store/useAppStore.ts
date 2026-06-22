@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { seedSnapshot } from "../data/seed";
 import { SUBJECT_COLORS } from "../lib/constants";
-import { signInWithEmail, signInWithGoogle, signOut, pullFromCloud, pushToCloud, resolveConflicts, ensureProfile } from "../services/syncService";
+import { signInWithEmail, signInWithGoogle, signOut, signUpWithEmail, pullFromCloud, pushToCloud, resolveConflicts, ensureProfile } from "../services/syncService";
 import { generateStudyPlanForExam, redistributeMissedStudyTasks } from "../services/studyPlanGenerator";
 import type {
   AppSettings,
@@ -52,6 +52,7 @@ interface AppStore extends AppSnapshot {
   setAuthReady: (ready: boolean) => void;
   setAuthSession: (user: UserProfile | null) => void;
   login: (provider?: "google" | "email", email?: string, password?: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<{ needsEmailConfirmation: boolean }>;
   logout: () => Promise<void>;
   syncNow: (retryCount?: number) => Promise<void>;
   enableCloudSync: (enabled: boolean) => Promise<void>;
@@ -303,11 +304,21 @@ export const useAppStore = create<AppStore>()(
         await signInWithGoogle();
       },
 
+      signUp: async (email, password) => {
+        if (!email || !password) throw new Error("E-Mail und Passwort sind erforderlich.");
+        return signUpWithEmail(email, password);
+      },
+
       logout: async () => {
-        await signOut();
+        try {
+          await signOut();
+        } catch {
+          // Still clear local auth if remote sign-out fails.
+        }
         set({
           user: null,
           isAuthenticated: false,
+          authReady: true,
           syncStatus: "idle",
           lastSyncedAt: undefined,
           syncError: undefined,
@@ -358,6 +369,8 @@ export const useAppStore = create<AppStore>()(
         } catch (error) {
           const message = error instanceof Error ? error.message : "Unbekannter Sync-Fehler";
           set({ syncStatus: "error", syncError: message });
+          const isConfigError = message.toLowerCase().includes("api-key") || message.toLowerCase().includes("api key");
+          if (isConfigError || retryCount >= 2) return;
           if (retryCount < 2) {
             await new Promise((resolve) => window.setTimeout(resolve, 1200 * (retryCount + 1)));
             await get().syncNow(retryCount + 1);
@@ -396,18 +409,22 @@ export const useAppStore = create<AppStore>()(
         materials: state.materials,
         stats: state.stats,
         settings: state.settings,
-        user: state.user,
-        isAuthenticated: state.isAuthenticated,
         syncStatus: state.syncStatus,
         lastSyncedAt: state.lastSyncedAt,
         syncError: state.syncError
       }),
       onRehydrateStorage: () => (state) => {
-        if (state && state.settings.tutorialCompleted === undefined) {
-          state.settings.tutorialCompleted = false;
+        if (state) {
+          if (state.settings.tutorialCompleted === undefined) {
+            state.settings.tutorialCompleted = false;
+          }
+          // Never trust cached auth — always re-validate with Supabase on startup.
+          state.user = null;
+          state.isAuthenticated = false;
+          state.authReady = false;
+          state.hasHydrated = true;
         }
         state?.syncBadges();
-        if (state) state.hasHydrated = true;
       }
     }
   )

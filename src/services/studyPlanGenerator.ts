@@ -12,7 +12,7 @@ export function generateStudyPlanForExam(exam: Exam, topics: Topic[], baseDate =
     ? sortedTopics
     : [
         { id: `${exam.id}-fallback-1`, name: "Grundlagen festigen", difficulty: 3, estimatedMinutes: 30 },
-        { id: `${exam.id}-fallback-2`, name: "Uebungsaufgaben loesen", difficulty: 4, estimatedMinutes: 40 },
+        { id: `${exam.id}-fallback-2`, name: "Übungsaufgaben lösen", difficulty: 4, estimatedMinutes: 40 },
         { id: `${exam.id}-fallback-3`, name: "Probeklausur schreiben", difficulty: 5, estimatedMinutes: 50 }
       ];
 

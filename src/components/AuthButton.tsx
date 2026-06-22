@@ -12,7 +12,7 @@ export function AuthButton() {
   if (!isAuthenticated) {
     return (
       <button
-        onClick={() => navigate(ROUTES.login)}
+        onClick={() => navigate(ROUTES.signup)}
         className="inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
       >
         <LogIn size={16} />
@@ -25,7 +25,7 @@ export function AuthButton() {
     <button
       onClick={async () => {
         await logout();
-        navigate(ROUTES.login, { replace: true });
+        navigate(ROUTES.signup, { replace: true });
       }}
       className="inline-flex max-w-[10rem] items-center gap-2 truncate rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
     >

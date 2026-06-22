@@ -13,7 +13,7 @@ export function FocusModePage() {
       <section className="space-y-4">
         <StatCard label="Gesamte Fokuszeit" value={formatMinutes(stats.studyTime)} detail="Alle Aufgaben und Fokus-Sessions summiert." />
         <StatCard label="Sessions" value={`${stats.focusSessions.length}`} detail="Abgeschlossene Pomodoro-Einheiten." />
-        <StatCard label="Aktueller Streak" value={`${stats.streak} Tage`} detail="XP gibt es nur fuer erledigte Sessions." />
+        <StatCard label="Aktueller Streak" value={`${stats.streak} Tage`} detail="XP gibt es nur für erledigte Sessions." />
       </section>
     </div>
   );

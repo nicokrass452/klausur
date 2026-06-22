@@ -37,7 +37,7 @@ export function DashboardPage() {
     <div className="space-y-6">
       <section className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         <article className="rounded-[28px] border border-teal-200/60 bg-gradient-to-br from-teal-500/95 via-cyan-400/90 to-orange-300/85 p-6 text-slate-950 shadow-panel md:p-7">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-900/70">Naechste Klausur</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-900/70">Nächste Klausur</p>
           <div className="mt-5 flex flex-wrap items-end justify-between gap-4">
             <div>
               <h3 className="font-display text-4xl">{nextExam ? nextExam.subject : "Noch keine Klausur"}</h3>
@@ -64,7 +64,7 @@ export function DashboardPage() {
 
         <article className="surface-card p-6">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Lerncoach</p>
-          <h3 className="mt-3 font-display text-2xl text-slate-950 dark:text-white">{coachMessage?.title ?? "Coach laedt..."}</h3>
+          <h3 className="mt-3 font-display text-2xl text-slate-950 dark:text-white">{coachMessage?.title ?? "Coach lädt..."}</h3>
           <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{coachMessage?.body ?? "Analyse deiner offenen Aufgaben und Streak-Daten."}</p>
         </article>
       </section>
@@ -72,8 +72,8 @@ export function DashboardPage() {
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Lernstreak" value={`${stats.streak} Tage`} icon={<Flame className="text-orange-500" size={18} />} />
         <StatCard label="Fokuszeit" value={formatMinutes(stats.studyTime)} icon={<Timer className="text-teal-500" size={18} />} />
-        <StatCard label="Naechste Klausur" value={nextExam ? `${daysUntil(nextExam.date)} Tage` : "-"} icon={<CalendarClock className="text-cyan-500" size={18} />} />
-        <StatCard label="Heute offen" value={`${todayTasks.length}`} detail="Aufgaben fuer heute" />
+        <StatCard label="Nächste Klausur" value={nextExam ? `${daysUntil(nextExam.date)} Tage` : "-"} icon={<CalendarClock className="text-cyan-500" size={18} />} />
+        <StatCard label="Heute offen" value={`${todayTasks.length}`} detail="Aufgaben für heute" />
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
@@ -90,7 +90,7 @@ export function DashboardPage() {
                 exam={exams.find((exam) => exam.id === task.examId)}
                 onComplete={() => setTaskStatus(task.id, task.status === "done" ? "open" : "done")}
               />
-            )) : <p className="text-sm text-slate-500">Heute ist dein Plan leer. Nutze den Fokusmodus fuer freie Wiederholung.</p>}
+            )) : <p className="text-sm text-slate-500">Heute ist dein Plan leer. Nutze den Fokusmodus für freie Wiederholung.</p>}
           </div>
         </article>
 
@@ -101,11 +101,7 @@ export function DashboardPage() {
               const progress = getExamProgress(exam.id, topics);
               return (
                 <div key={exam.id}>
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="font-medium text-slate-900 dark:text-white">{exam.subject}</span>
-                    <span className="text-sm text-slate-500">{progress}%</span>
-                  </div>
-                  <ProgressBar value={progress} />
+                  <ProgressBar value={progress} label={exam.subject} showValue />
                 </div>
               );
             })}

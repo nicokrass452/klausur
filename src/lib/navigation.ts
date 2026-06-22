@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { ROUTES } from "./constants";
 
-export const PUBLIC_ROUTES = [ROUTES.calendar, ROUTES.login] as const;
+export const PUBLIC_ROUTES = [ROUTES.calendar, ROUTES.login, ROUTES.signup] as const;
 
 export interface NavItem {
   to: string;

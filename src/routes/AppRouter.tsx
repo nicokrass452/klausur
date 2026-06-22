@@ -22,15 +22,18 @@ function withSuspense(element: React.ReactNode) {
 }
 
 function HomeRedirect() {
+  const authReady = useAppStore((state) => state.authReady);
   const isAuthenticated = useAppStore((state) => state.isAuthenticated);
-  return <Navigate to={isAuthenticated ? ROUTES.dashboard : ROUTES.login} replace />;
+  if (!authReady) return null;
+  return <Navigate to={isAuthenticated ? ROUTES.dashboard : ROUTES.signup} replace />;
 }
 
 export function AppRouter() {
   return (
     <Routes>
       <Route path="/" element={<HomeRedirect />} />
-      <Route path={ROUTES.login} element={withSuspense(<LoginPage />)} />
+      <Route path={ROUTES.login} element={withSuspense(<LoginPage mode="login" />)} />
+      <Route path={ROUTES.signup} element={withSuspense(<LoginPage mode="signup" />)} />
       <Route element={<AuthGuard />}>
         <Route element={<Layout />}>
           <Route path={ROUTES.dashboard} element={withSuspense(<DashboardPage />)} />

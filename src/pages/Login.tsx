@@ -1,24 +1,35 @@
 import { useEffect, useState } from "react";
-import { CalendarDays, Chrome, Mail } from "lucide-react";
+import { CalendarDays, Chrome, Mail, UserPlus } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ROUTES } from "../lib/constants";
-import { hasGoogleAuthEnv, hasSupabaseEnv } from "../lib/supabase";
+import { getSupabaseConfigIssue, hasGoogleAuthEnv, hasSupabaseEnv } from "../lib/supabase";
 import { useAppStore } from "../store/useAppStore";
 
-export function LoginPage() {
+type AuthMode = "login" | "signup";
+
+interface LoginPageProps {
+  mode?: AuthMode;
+}
+
+export function LoginPage({ mode = "login" }: LoginPageProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const authReady = useAppStore((state) => state.authReady);
   const isAuthenticated = useAppStore((state) => state.isAuthenticated);
   const login = useAppStore((state) => state.login);
-  const syncError = useAppStore((state) => state.syncError);
+  const signUp = useAppStore((state) => state.signUp);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authInfo, setAuthInfo] = useState<string | null>(null);
   const redirectTo = (location.state as { from?: string } | null)?.from ?? ROUTES.dashboard;
+  const isSignup = mode === "signup";
+  const configIssue = getSupabaseConfigIssue();
 
   useEffect(() => {
-    if (isAuthenticated) navigate(redirectTo, { replace: true });
-  }, [isAuthenticated, navigate, redirectTo]);
+    if (authReady && isAuthenticated) navigate(redirectTo, { replace: true });
+  }, [authReady, isAuthenticated, navigate, redirectTo]);
 
   return (
     <main className="min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -27,71 +38,106 @@ export function LoginPage() {
         <section className="hidden lg:block">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">Klausurplaner</p>
           <h1 className="mt-4 max-w-lg font-display text-5xl leading-tight text-slate-950 dark:text-white">
-            Online lernen, Klausuren im Griff behalten.
+            {isSignup ? "Account erstellen und loslegen." : "Willkommen zurück."}
           </h1>
           <p className="mt-5 max-w-md text-base leading-7 text-slate-600 dark:text-slate-300">
-            Mit Account nutzt du Cloud-Sync, KI-Coach, automatischen Lernplan und Fortschritt auf allen Geraeten.
+            Mit Account nutzt du Cloud-Sync, KI-Coach, automatischen Lernplan und Fortschritt auf allen Geräten.
             Ohne Login kannst du nur den Kalender mit Terminen ansehen.
           </p>
-          <div className="mt-8 grid max-w-md gap-3">
-            {["Automatischer Lernplan mit Spaced Repetition", "KI-Coach, Quiz und Flashcards", "XP, Streak und Analytics"].map((item) => (
-              <div key={item} className="rounded-2xl border border-slate-200/80 bg-white/80 px-4 py-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-200">
-                {item}
-              </div>
-            ))}
-          </div>
         </section>
 
         <section className="w-full rounded-[28px] border border-slate-200/80 bg-white/90 p-7 shadow-panel backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400 lg:hidden">Klausurplaner</p>
-          <h2 className="mt-2 font-display text-3xl text-slate-950 dark:text-white lg:mt-0">Anmelden</h2>
+          <div className="segmented-control w-full">
+            <Link
+              to={ROUTES.signup}
+              className={`segmented-control__item flex-1 text-center ${isSignup ? "segmented-control__item--active" : ""}`}
+            >
+              Registrieren
+            </Link>
+            <Link
+              to={ROUTES.login}
+              className={`segmented-control__item flex-1 text-center ${!isSignup ? "segmented-control__item--active" : ""}`}
+            >
+              Anmelden
+            </Link>
+          </div>
+
+          <h2 className="mt-6 font-display text-3xl text-slate-950 dark:text-white">
+            {isSignup ? "Registrieren" : "Anmelden"}
+          </h2>
           <p className="mt-2 text-sm leading-6 text-slate-500">
-            Online-first: Melde dich an, damit deine Daten synchronisiert werden und alle Funktionen verfuegbar sind.
+            {isSignup
+              ? "Erstelle einen Account für Cloud-Sync und alle Funktionen."
+              : "Melde dich an, damit deine Daten synchronisiert werden."}
           </p>
 
-          {!hasSupabaseEnv ? (
+          {!hasSupabaseEnv || configIssue ? (
             <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
-              Supabase ist noch nicht konfiguriert. Lege zuerst `.env` anhand von `.env.example` an.
+              {configIssue ?? "Supabase ist nicht konfiguriert. Lege `.env` anhand von `.env.example` an und starte den Dev-Server neu."}
             </div>
           ) : null}
 
           {hasSupabaseEnv && !hasGoogleAuthEnv ? (
             <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
-              Google Login ist noch nicht lokal konfiguriert. Setze `VITE_GOOGLE_CLIENT_ID` in `.env` und aktiviere Google als Provider in Supabase Auth.
+              Google Login ist noch nicht konfiguriert. E-Mail-Registrierung funktioniert trotzdem.
             </div>
           ) : null}
 
-          {syncError ? (
+          {authError ? (
             <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">
-              {syncError}
+              {authError}
             </div>
           ) : null}
 
-          <div className="mt-6 space-y-3">
-            <button
-              disabled={!hasGoogleAuthEnv || submitting}
-              onClick={async () => {
-                setSubmitting(true);
-                try {
-                  await login("google");
-                } finally {
-                  setSubmitting(false);
-                }
-              }}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3.5 text-sm font-semibold text-white disabled:opacity-50 dark:bg-teal-500 dark:text-slate-950"
-            >
-              <Chrome size={16} />
-              Mit Google anmelden
-            </button>
-          </div>
+          {authInfo ? (
+            <div className="mt-5 rounded-2xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-800 dark:border-teal-900/60 dark:bg-teal-950/30 dark:text-teal-300">
+              {authInfo}
+            </div>
+          ) : null}
+
+          {!isSignup ? (
+            <div className="mt-6 space-y-3">
+              <button
+                disabled={!hasGoogleAuthEnv || submitting}
+                onClick={async () => {
+                  setSubmitting(true);
+                  setAuthError(null);
+                  setAuthInfo(null);
+                  try {
+                    await login("google");
+                  } catch (error) {
+                    setAuthError(error instanceof Error ? error.message : "Google-Anmeldung fehlgeschlagen.");
+                  } finally {
+                    setSubmitting(false);
+                  }
+                }}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3.5 text-sm font-semibold text-white disabled:opacity-50 dark:bg-teal-500 dark:text-slate-950"
+              >
+                <Chrome size={16} />
+                Mit Google anmelden
+              </button>
+            </div>
+          ) : null}
 
           <form
             className="mt-6 space-y-4"
             onSubmit={async (event) => {
               event.preventDefault();
               setSubmitting(true);
+              setAuthError(null);
+              setAuthInfo(null);
               try {
-                await login("email", email, password);
+                if (isSignup) {
+                  const { needsEmailConfirmation } = await signUp(email, password);
+                  if (needsEmailConfirmation) {
+                    setAuthInfo("Account erstellt. Bitte bestätige deine E-Mail und melde dich danach an.");
+                    navigate(ROUTES.login, { replace: true });
+                  }
+                } else {
+                  await login("email", email, password);
+                }
+              } catch (error) {
+                setAuthError(error instanceof Error ? error.message : isSignup ? "Registrierung fehlgeschlagen." : "Anmeldung fehlgeschlagen.");
               } finally {
                 setSubmitting(false);
               }
@@ -104,6 +150,8 @@ export function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
+                required
+                autoComplete="email"
               />
             </label>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -113,6 +161,9 @@ export function LoginPage() {
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
+                required
+                minLength={6}
+                autoComplete={isSignup ? "new-password" : "current-password"}
               />
             </label>
             <button
@@ -120,8 +171,8 @@ export function LoginPage() {
               disabled={!hasSupabaseEnv || submitting}
               className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200"
             >
-              <Mail size={16} />
-              Mit E-Mail anmelden
+              {isSignup ? <UserPlus size={16} /> : <Mail size={16} />}
+              {isSignup ? "Account erstellen" : "Mit E-Mail anmelden"}
             </button>
           </form>
 
