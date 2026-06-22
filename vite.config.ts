@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 
@@ -16,6 +17,11 @@ export default defineConfig(({ mode }) => {
         host: "localhost",
         clientPort: devHmrClientPort
       }
+    },
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      setupFiles: './src/setupTests.ts',
     },
     build: {
       rollupOptions: {

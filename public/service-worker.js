@@ -1,4 +1,4 @@
-const CACHE_NAME = "klausurplaner-shell-v3";
+const CACHE_NAME = "klausurplaner-shell-v4";
 const OFFLINE_URLS = ["/", "/dashboard", "/manifest.json", "/icons/icon-192.svg", "/icons/icon-512.svg"];
 const DEV_PATH_PREFIXES = ["/@vite", "/@react-refresh", "/src/", "/node_modules/"];
 
@@ -17,18 +17,39 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   const url = new URL(event.request.url);
+
   if (url.origin !== self.location.origin || DEV_PATH_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))) {
     return;
   }
+
+  // Stale-While-Revalidate caching strategy for shell stability
   event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        if (response.ok) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+    caches.match(event.request).then((cachedResponse) => {
+      const fetchPromise = fetch(event.request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
         }
-        return response;
-      })
-      .catch(() => caches.match(event.request).then((cached) => cached ?? caches.match("/")))
+        return networkResponse;
+      }).catch(() => {
+        // Fallback for navigation requests
+        if (event.request.mode === 'navigate') {
+          return caches.match("/");
+        }
+      });
+
+      return cachedResponse || fetchPromise;
+    })
+  );
+});
+
+// TODO: Implement Web Push Notifications background sync here
+self.addEventListener("push", (event) => {
+  const data = event.data?.json() ?? { title: "Neue Benachrichtigung", body: "" };
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: "/icons/icon-192.svg"
+    })
   );
 });

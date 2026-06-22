@@ -3,7 +3,7 @@ export type CalendarMode = "week" | "month";
 export type TaskType = "learn" | "review" | "buffer";
 export type TaskStatus = "open" | "done" | "missed";
 export type MaterialType = "pdf" | "note" | "video";
-export type SyncStatus = "idle" | "syncing" | "error" | "success";
+export type SyncStatus = "idle" | "syncing" | "error" | "success" | "pending_offline";
 
 export interface SyncableEntity {
   userId?: string;
@@ -138,6 +138,7 @@ export interface AppSnapshot {
   syncStatus: SyncStatus;
   lastSyncedAt?: string;
   syncError?: string;
+  pendingOfflineChanges?: boolean;
 }
 
 export interface CloudTableRow<T extends object> {

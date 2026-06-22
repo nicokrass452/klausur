@@ -38,7 +38,13 @@ export default function App() {
   }, [cloudSyncEnabled, setAuthReady, setAuthSession]);
 
   useEffect(() => {
-    const update = () => setOnlineStatus(window.navigator.onLine);
+    const update = () => {
+      setOnlineStatus(window.navigator.onLine);
+      const store = useAppStore.getState();
+      if (window.navigator.onLine && store.pendingOfflineChanges && store.settings.cloudSyncEnabled) {
+        store.syncNow();
+      }
+    };
     update();
     window.addEventListener("online", update);
     window.addEventListener("offline", update);
@@ -53,6 +59,18 @@ export default function App() {
       void syncNow();
     }
   }, [isAuthenticated, cloudSyncEnabled, syncNow]);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      // Only show prompt logic could be added here later (e.g. state.setInstallPromptEvent(e))
+      // Currently, it holds the event. In a full implementation, you'd save `e` to a global state
+      // and show a custom install button.
+      (window as any).deferredPrompt = e;
+    };
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+  }, []);
 
   if (!hydrated || !authReady) {
     return <div className="grid min-h-screen place-items-center bg-slate-950 text-white">Klausurplaner lädt...</div>;
