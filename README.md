@@ -1,30 +1,33 @@
 # Klausurplaner PWA
 
-Klausurplaner ist eine mobile-first Progressive Web App fuer Schueler. Die App organisiert Klausuren, generiert Lernplaene, trackt Fortschritt und kombiniert Fokusmodus, Analytics und Gamification.
+Klausurplaner ist eine mobile-first Progressive Web App für Schülerinnen und Schüler. Die App organisiert Klausuren, generiert Lernpläne, trackt Fortschritt und kombiniert Fokusmodus, Analytics, Gamification und einen KI-Coach.
+
+Die App ist **über das MVP hinaus gewachsen**: Supabase-Auth, Cloud-Sync, Gast-Vorschau und ein geführtes Onboarding sind implementiert. Für ein produktionsreifes Produkt fehlen noch Tests, echtes Offline-Verhalten, Push im Hintergrund und mehrere Backend-/Sync-Härtungen — siehe [Bekannte Probleme & offene Punkte](#bekannte-probleme--offene-punkte).
 
 ## Stack
 
-- React 19
+- React 19 + TypeScript
 - Vite 7
-- lucide-react fuer Icons
-- LocalStorage als lokale Datenbank
-- Web App Manifest und eigener Service Worker
-- Mobile-first CSS mit Dark Mode
+- Zustand (Persist via LocalStorage)
+- Supabase Auth + Postgres (Cloud-Sync)
+- Tailwind CSS 4, lucide-react
+- PWA: Web App Manifest + Service Worker
 
 ## Lokal starten
 
 ```powershell
 npm install
+cp .env.example .env   # Werte eintragen, siehe unten
 npm run dev
 ```
 
-Danach im Browser oeffnen:
+Standard-URL (Port aus `.env`, Default `5177`):
 
 ```text
-http://localhost:5173
+http://localhost:5177
 ```
 
-Falls Port `5173` belegt ist:
+Anderen Port erzwingen:
 
 ```powershell
 npm run dev -- --port 5174
@@ -34,29 +37,81 @@ Produktionsbuild:
 
 ```powershell
 npm run build
+npm run preview
 ```
 
-## Google Login
+**Wichtig:** `VITE_*`-Variablen werden beim Build eingebettet. Für Deployments müssen sie in der CI/CD-Umgebung **vor** `npm run build` gesetzt sein. Nach Änderungen an `.env` den Dev-Server neu starten.
 
-Die App nutzt Supabase Auth mit dem Google OAuth Provider. Lokal ist die bereitgestellte Client-ID in `.env` hinterlegt:
+## Umgebungsvariablen
+
+Kopiere `.env.example` nach `.env` und trage deine Werte ein:
 
 ```text
-VITE_GOOGLE_CLIENT_ID=453682404003-h2rnpp1tdg3t4ifs8tvq7c52attuf7cm.apps.googleusercontent.com
+VITE_SUPABASE_URL=https://your-project-ref.supabase.co
+VITE_SUPABASE_ANON_KEY=sb_publishable_your-key-here
+VITE_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
 VITE_AUTH_REDIRECT_URL=http://localhost:5177/dashboard
-VITE_DEV_SERVER_PORT=5174
+VITE_DEV_SERVER_PORT=5177
 VITE_DEV_HMR_CLIENT_PORT=5177
 ```
 
-Damit der Login funktioniert, muss Google in Supabase aktiviert sein:
+### Supabase einrichten
 
-1. In Supabase `Authentication` -> `Providers` -> `Google` oeffnen.
-2. Google Provider aktivieren und Google Client-ID plus Client Secret eintragen.
-3. In Supabase `Authentication` -> `URL Configuration` die Redirect URL `http://localhost:5177/dashboard` erlauben.
-4. In der Google Cloud Console dieselbe Redirect URL fuer den OAuth Client erlauben, falls sie dort noch fehlt.
+1. Neues Supabase-Projekt anlegen.
+2. Im **SQL Editor** die Datei `supabase-schema.sql` ausführen (Tabellen + Row Level Security).
+3. Unter **Settings → API Keys** die Publishable Key (oder legacy anon JWT) nach `VITE_SUPABASE_ANON_KEY` kopieren.
+4. Optional: **Authentication → Providers → Google** aktivieren und Client-ID/Secret eintragen.
+5. Unter **Authentication → URL Configuration** die Redirect-URL erlauben (z. B. `http://localhost:5177/dashboard`).
 
-## GLM KI mit DeepSeek-Fallback ueber Supabase Edge Function
+### Google Login
 
-Die GLM API von Zhipu und die DeepSeek API werden nicht direkt aus dem Browser aufgerufen. Das Frontend ruft `supabase.functions.invoke("ai-coach")` auf; die Edge Function prueft das Supabase Auth JWT, validiert Eingaben, begrenzt Requests pro Nutzer und ruft erst GLM auf. Wenn GLM nicht erreichbar ist, wird DeepSeek versucht. Erst wenn beide Provider fehlschlagen, nutzt das Frontend automatisch den lokalen Mock-Fallback.
+1. In Supabase `Authentication` → `Providers` → `Google` öffnen.
+2. Google Provider aktivieren und Client-ID plus Client Secret eintragen.
+3. In Supabase `Authentication` → `URL Configuration` die Redirect-URL erlauben.
+4. In der Google Cloud Console dieselbe Redirect-URL für den OAuth-Client freigeben.
+
+## Auth & Zugriffsmodell
+
+| Zustand | Verfügbar |
+|--------|-----------|
+| **Gast** (ohne Account) | Nur Kalender-Vorschau mit Terminen |
+| **Eingeloggt** | Dashboard, Klausuren, Lernplan, Coach, Fokus, Analytics, Settings, Cloud-Sync |
+
+- Registrierung: `/signup` (E-Mail oder Google)
+- Anmeldung: `/login`
+- Nach dem ersten Login: geführtes Onboarding-Tutorial (11 Schritte, alle Hauptfunktionen)
+- Auth-Session wird bei jedem Start serverseitig über Supabase validiert (kein vertrauenswürdiger Cache)
+
+## Aktuelle Funktionen
+
+### Lernen & Planung
+- Klausuren mit Fach, Datum, Uhrzeit, Raum, Notizen, Schwierigkeit, Wissensstand, Tagesminuten
+- Themen mit Fortschritt in Prozent
+- Automatischer Lernplan (Prioritätsformel, 70/20/10, Spaced Repetition: Tag 1, 2, 5, 10, 18)
+- Manuelle Neuverteilung verpasster Aufgaben
+- Lernmaterialien (Notizen, Links) pro Klausur — UI vorhanden, Upload noch begrenzt
+
+### Produktivität & Motivation
+- Dashboard: nächste Klausur, Countdown, XP, Level, Streak, Fokuszeit
+- Kalender (Woche/Monat)
+- Pomodoro-Fokusmodus (25/5)
+- Analytics: Lernzeit, Fortschritt, Schwachstellen (Basis)
+- Gamification: XP, Level, Badges, Streak
+
+### KI & Cloud
+- KI-Coach mit Modi: Coach, Quiz, Karteikarten, Plan, Erklären
+- GLM + DeepSeek über Supabase Edge Function `ai-coach` (Mock-Fallback lokal)
+- Supabase Cloud-Sync (Push/Pull mit Konfliktauflösung nach `updatedAt`)
+- Browser-Benachrichtigungen (nur bei geöffneter App und erteilter Permission)
+
+### UI
+- Mobile-first, Bottom-Navigation + Sidebar
+- Dark Mode
+- Überarbeitete Fortschrittsbalken, Segmented Controls, deutsche Umlaute
+
+## GLM KI mit DeepSeek-Fallback (Edge Function)
+
+Die GLM- und DeepSeek-APIs werden nicht direkt aus dem Browser aufgerufen. Das Frontend ruft `supabase.functions.invoke("ai-coach")` auf; die Edge Function prüft das Supabase-Auth-JWT, validiert Eingaben und ruft erst GLM, dann DeepSeek auf. Erst wenn beide Provider fehlschlagen, nutzt das Frontend den lokalen Mock-Fallback.
 
 Edge Function deployen:
 
@@ -76,7 +131,7 @@ Lokal testen:
 supabase functions serve ai-coach --env-file ./supabase/.env.local
 ```
 
-`supabase/.env.local` sollte nur lokal existieren und nicht ins Frontend:
+`supabase/.env.local` nur lokal verwenden — nicht ins Frontend oder Git:
 
 ```text
 GLM_API_KEY=...
@@ -85,233 +140,140 @@ DEEPSEEK_API_KEY=...
 DEEPSEEK_MODEL=deepseek-v4-flash
 ```
 
-Optional kann `GLM_API_BASE` gesetzt werden, falls Zhipu einen anderen OpenAI-kompatiblen Chat-Completions-Endpunkt verwenden soll. Standard ist `https://open.bigmodel.cn/api/paas/v4/chat/completions`.
-Optional kann `DEEPSEEK_API_BASE` gesetzt werden. Standard ist `https://api.deepseek.com/chat/completions`.
-
-Wichtig: `GLM_API_KEY` und `DEEPSEEK_API_KEY` nicht in `.env`, `.env.example` oder als `VITE_*` Variable eintragen. Nur Supabase Secrets oder lokale Function-ENV verwenden.
-
-## MVP-Funktionen
-
-- Klausuren erstellen: Fach, Datum, Uhrzeit, Raum, Notizen, Schwierigkeit, Wissensstand, Lernzeit
-- Themenmanagement mit Checkboxen und Fortschritt in Prozent
-- Automatischer Lernplan mit Prioritaetsformel
-- Spaced-Repetition-Intervalle: Tag 1, 2, 5, 10, 18
-- 70/20/10-Aufteilung: Lernen, Wiederholung, Puffer
-- Neuverteilung verpasster Aufgaben
-- Dashboard mit naechster Klausur, Countdown, XP, Level, Streak und Fokuszeit
-- Kalenderansicht fuer Woche und Monat
-- Pomodoro-Fokusmodus 25/5
-- Analytics mit Lernzeit, Fortschritt und Schwachstellen
-- AI Trainer als Chat mit Coach-, Quiz-, Flashcard-, Plan- und Erklaermodus
-- Dark Mode, LocalStorage, Manifest, Service Worker, Offline-Cache
+**Wichtig:** `GLM_API_KEY` und `DEEPSEEK_API_KEY` nie in `.env`, `.env.example` oder als `VITE_*` eintragen.
 
 ## Projektstruktur
 
 ```text
 index.html
 package.json
-vite.config.js
+vite.config.ts
+supabase-schema.sql          # Postgres-Schema + RLS
+supabase/functions/ai-coach/ # Edge Function für KI
 src/
-  main.jsx       React-App, Komponenten, State, Lernplanlogik
-  styles.css     Designsystem und responsive UI
+  main.tsx
+  App.tsx
+  routes/AppRouter.tsx
+  pages/                     # Dashboard, Calendar, Exams, Coach, …
+  components/                # UI, AuthGuard, Tutorial, Navigation
+  store/useAppStore.ts       # Zustand + Persist
+  services/                  # syncService, aiService, studyPlanGenerator
+  lib/                       # supabase, constants, navigation
+  styles/globals.css
 public/
-  manifest.webmanifest
-  sw.js
+  manifest.json
+  service-worker.js
   icons/
 ```
 
 ## Architektur
 
-Der MVP ist eine reine Client-PWA:
-
 ```text
-React UI
-  Komponenten fuer Dashboard, Kalender, Klausuren, Lernplan, Fokus, Statistik, Settings
-State Layer
-  usePersistentState + LocalStorage
-Domain Logic
-  Lernplan-Generator, Spaced Repetition, XP/Streak/Level, Neuverteilung
-PWA Layer
-  Manifest, Service Worker, Install Prompt, Offline Cache
+React UI (pages + components)
+  ↓
+Zustand Store (LocalStorage-Persist für Lern-Daten)
+  ↓
+Domain Services (Lernplan, Gamification, Sync, KI)
+  ↓
+Supabase (Auth + Postgres)     Edge Functions (ai-coach)
+  ↓
+PWA Layer (Manifest, Service Worker — Shell-Cache)
 ```
 
-Fuer Cloud Sync kann dieselbe Datenstruktur in Supabase, Firebase oder einer eigenen REST API gespeichert werden.
-
-## UI Design Konzept
-
-- Stil: clean, ruhig, produktiv, angelehnt an Notion/Todoist mit motivierenden Duolingo-Elementen
-- Layout: mobile-first, Bottom Navigation auf kleinen Screens, Sidebar auf Desktop
-- Komponenten: Karten fuer Klausuren, Aufgaben und Kennzahlen; Fortschrittsbalken; Status-Pills
-- Farben: Fachfarben pro Klausur, neutrale Flaechen, klare Primaeraktion
-- Dark Mode: global ueber CSS-Variablen
-- Interaktion: direkte Aktionen, kurze Formulare, sichtbarer Fortschritt
-
-## Datenmodell
-
-### Exams
-
-```json
-{
-  "id": "exam_123",
-  "subject": "Mathe",
-  "date": "2026-06-25",
-  "time": "09:00",
-  "room": "B112",
-  "notes": "Ableitungen, Kurvendiskussion",
-  "difficulty": 4,
-  "knowledgeLevel": 2,
-  "dailyMinutes": 45,
-  "color": "#2563eb"
-}
-```
-
-### Topics
-
-```json
-{
-  "id": "topic_123",
-  "examId": "exam_123",
-  "name": "Kurvendiskussion",
-  "completed": false
-}
-```
-
-### StudyPlan
-
-```json
-{
-  "id": "task_123",
-  "examId": "exam_123",
-  "date": "2026-06-18",
-  "task": "Kurvendiskussion lernen",
-  "type": "lernen",
-  "duration": 45,
-  "status": "open"
-}
-```
-
-### UserStats
-
-```json
-{
-  "studyTime": 180,
-  "streak": 4,
-  "xp": 320,
-  "level": 4,
-  "lastStudyDate": "2026-06-16"
-}
-```
+**Online-first:** Volle Funktionen erfordern Login und eine aktive Verbindung. LocalStorage dient als schneller lokaler Cache; die autoritative Cloud-Kopie liegt in Supabase nach erfolgreichem Sync.
 
 ## Lernplan-Algorithmus
 
-Prioritaet:
+Priorität:
 
 ```text
-prioritaet = (schwierigkeit * 2) + (6 - wissensstand)
+priorität = (schwierigkeit × 2) + (6 − wissensstand)
 ```
 
-Verteilung:
+Verteilung: 70 % neue Inhalte · 20 % Wiederholung · 10 % Puffer
 
-```text
-70% neue Inhalte
-20% Wiederholung
-10% Puffer
-```
-
-Spaced Repetition:
-
-```text
-Tag 1, 2, 5, 10, 18
-```
-
-Verpasste Aufgaben werden auf kommende Tage verschoben. Im MVP passiert das manuell ueber `Verpasste neu verteilen`; produktiv sollte das automatisch beim App-Start oder ueber einen Background Job laufen.
-
-## API Design
-
-```text
-POST   /api/auth/google
-GET    /api/me
-
-GET    /api/exams
-POST   /api/exams
-GET    /api/exams/:id
-PATCH  /api/exams/:id
-DELETE /api/exams/:id
-
-GET    /api/exams/:examId/topics
-POST   /api/exams/:examId/topics
-PATCH  /api/topics/:id
-DELETE /api/topics/:id
-
-POST   /api/exams/:examId/study-plan/generate
-GET    /api/study-plan?from=2026-06-16&to=2026-06-23
-PATCH  /api/study-plan/:id
-POST   /api/study-plan/redistribute
-
-GET    /api/stats
-POST   /api/focus-sessions
-
-POST   /api/ai/optimize-plan
-POST   /api/ai/generate-quiz
-POST   /api/ai/generate-flashcards
-POST   /api/ai/coach
-```
-
-## Beispiel Backend
-
-```js
-import express from "express";
-
-const app = express();
-app.use(express.json());
-
-const exams = [];
-const topics = [];
-const studyPlan = [];
-
-app.post("/api/exams", (req, res) => {
-  const exam = { id: crypto.randomUUID(), ...req.body };
-  exams.push(exam);
-  res.status(201).json(exam);
-});
-
-app.get("/api/exams", (req, res) => {
-  res.json(exams);
-});
-
-app.post("/api/exams/:examId/topics", (req, res) => {
-  const topic = { id: crypto.randomUUID(), examId: req.params.examId, completed: false, ...req.body };
-  topics.push(topic);
-  res.status(201).json(topic);
-});
-
-app.listen(3000);
-```
+Spaced Repetition: Tag 1, 2, 5, 10, 18
 
 ## User Flow
 
 ```mermaid
 flowchart TD
-  A[App oeffnen] --> B[Dashboard]
-  B --> C[Klausur erstellen]
-  C --> D[Themen hinzufuegen]
-  D --> E[Lernplan automatisch generieren]
-  E --> F[Heute lernen]
-  F --> G[Aufgabe abschliessen]
-  G --> H[XP, Streak, Fortschritt aktualisieren]
-  F --> I[Fokusmodus starten]
-  I --> H
-  H --> J[Statistik pruefen]
-  E --> K[Verpasste Aufgaben neu verteilen]
+  A[App öffnen] --> B{Eingeloggt?}
+  B -->|Nein| C[Kalender-Vorschau / Registrieren]
+  B -->|Ja| D[Onboarding-Tutorial]
+  D --> E[Dashboard]
+  E --> F[Klausur erstellen]
+  F --> G[Themen hinzufügen]
+  G --> H[Lernplan generieren]
+  H --> I[Heute lernen / Fokusmodus]
+  I --> J[Aufgabe abschließen]
+  J --> K[XP, Streak, Sync]
+  K --> L[Analytics / KI-Coach]
 ```
 
-## Erweiterungen
+## Bekannte Probleme & offene Punkte
 
-1. Cloud Sync mit Supabase oder Firebase
-2. Google Login und Multi-Device Sync
-3. PDF Uploads, Notizen und YouTube-Links
-4. Web Push Notifications mit Server-Key
-5. KI-Quiz, KI-Flashcards und Lerncoach
-6. Lerngruppen und geteilte Klausurplaene
-7. Adaptive Schwachstellenanalyse
-8. Kalenderintegration mit iCal Export
+Diese Liste beschreibt, was für ein **produktionsreifes Produkt jenseits des MVP** noch fehlt oder verbessert werden muss.
+
+### Infrastruktur & Backend
+- [ ] **Datenbank-Setup manuell** — `supabase-schema.sql` muss per Hand im SQL Editor laufen; keine versionierten Supabase-Migrationen oder automatisches Provisioning.
+- [ ] **Keine CI/CD-Pipeline** — kein automatischer Build, Test oder Deploy bei Push.
+- [ ] **Keine automatisierten Tests** — weder Unit- noch E2E-Tests; Refactorings und Sync-Logik sind ungeschützt.
+- [ ] **Deploy-Env** — Production-Builds ohne gesetzte `VITE_*`-Variablen führen zu leerem API-Key und Auth-/Sync-Fehlern.
+
+### Auth & Account
+- [ ] **Passwort zurücksetzen** — kein „Passwort vergessen“-Flow in der UI.
+- [ ] **Account löschen** — kein Self-Service zum Löschen des Accounts und aller Cloud-Daten.
+- [ ] **E-Mail-Bestätigung** — Verhalten hängt von Supabase-Einstellungen ab; UX für unbestätigte Accounts noch minimal.
+- [ ] **Session-Handling auf mehreren Geräten** — kein explizites Geräte-Management oder „überall abmelden“ außer globalem Sign-out.
+
+### Sync & Daten
+- [ ] **Sync-Strategie grob** — vollständiger Push/Pull-Snapshot statt inkrementeller Änderungen oder Realtime-Subscriptions.
+- [ ] **Konfliktauflösung simpel** — nur Last-Write-Wins nach `updatedAt`; kein Merge bei gleichzeitigen Bearbeitungen.
+- [ ] **Kein Offline-Queue** — Änderungen offline werden nicht zuverlässig nach Sync nachgeholt; bei Verbindungsabbruch während Sync können Inkonsistenzen entstehen.
+- [ ] **Materialien / Dateien** — Schema und UI für PDFs/Notizen vorhanden, aber kein Upload in Supabase Storage, keine Vorschau, keine Größenlimits.
+- [ ] **Seed-Daten für Gäste** — Kalender-Vorschau nutzt Demo-Daten; keine echte anonyme Cloud-Vorschau.
+
+### Lernlogik & Features
+- [ ] **Verpasste Aufgaben** — Neuverteilung nur manuell über Button, nicht automatisch beim App-Start oder per Cron.
+- [ ] **Lernplan nicht adaptiv** — keine echte Schwachstellenanalyse oder dynamische Priorisierung aus Nutzungsdaten.
+- [ ] **Analytics basic** — keine Exporte, keine Langzeit-Trends, keine Vergleiche zwischen Fächern.
+- [ ] **Kein iCal/Google-Calendar-Export** — Klausurtermine nicht in externe Kalender integrierbar.
+- [ ] **Keine Lerngruppen** — kein Teilen von Plänen, keine gemeinsamen Klausuren.
+
+### KI
+- [ ] **Edge Function Pflicht für echte KI** — ohne Deploy nur Mock-Antworten; kein Hinweis in der UI, welcher Provider aktiv ist (außer implizit).
+- [ ] **Kein Rate-Limit-Feedback** — Nutzer sehen nicht, wenn KI-Kontingente erschöpft sind.
+- [ ] **Kein Kontext aus Materialien** — Coach kennt hochgeladene PDFs/Notizen noch nicht.
+
+### PWA & Benachrichtigungen
+- [ ] **Service Worker minimal** — cached nur App-Shell; authentifizierte Seiten und API-Daten funktionieren offline nicht.
+- [ ] **Kein Web Push im Hintergrund** — Benachrichtigungen nur über die Browser-Notification-API bei geöffneter App, keine Push-Subscription oder Server-Trigger.
+- [ ] **Kein Install-Prompt-Flow** — PWA installierbar, aber kein geführtes „Zum Startbildschirm hinzufügen“.
+
+### UI & UX
+- [ ] **Tutorial nicht überspringbar** — erzwungenes Onboarding beim ersten Login; kein „Später“ für erfahrene Nutzer.
+- [ ] **Fehler-Feedback bei Sync** — Status-Badge zeigt „Sync Fehler“, Details nur in Settings; kein Retry-UI in der Hauptnavigation.
+- [ ] **Barrierefreiheit** — keine systematische ARIA-/Tastatur-/Screenreader-Prüfung.
+- [ ] **Internationalisierung** — nur Deutsch; keine i18n-Infrastruktur.
+
+### Sicherheit & Betrieb
+- [ ] **RLS Policies** — im Schema definiert, aber nicht automatisch in jedem Projekt verifiziert.
+- [ ] **API-Key-Rotation** — keine Dokumentation für Wechsel von Publishable/Legacy-Keys in laufenden Deployments.
+- [ ] **Observability** — kein Logging, Monitoring oder Error-Tracking (Sentry o. Ä.).
+
+## Roadmap (kurz)
+
+Priorität für die nächsten Ausbaustufen:
+
+1. Automatisierte Supabase-Migrationen + CI mit Env-Secrets
+2. Test-Suite (Sync, Auth, Lernplan-Generator)
+3. Inkrementeller Sync + Offline-Queue
+4. Web Push + Hintergrund-Erinnerungen
+5. Datei-Upload (Supabase Storage) + KI-Kontext aus Materialien
+6. Passwort-Reset, Account-Löschung, besseres Multi-Device-Verhalten
+7. Adaptive Lernplanung und Kalender-Export
+
+## Lizenz
+
+Privates Projekt — siehe Repository-Inhaber.
