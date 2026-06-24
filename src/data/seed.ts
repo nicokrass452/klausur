@@ -110,5 +110,6 @@ export const seedSnapshot: AppSnapshot = {
   isAuthenticated: false,
   syncStatus: "idle",
   lastSyncedAt: undefined,
-  syncError: undefined
+  syncError: undefined,
+  pendingWriteCount: 0
 };

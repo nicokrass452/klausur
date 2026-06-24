@@ -11,6 +11,8 @@ export function SettingsPage() {
   const syncStatus = useAppStore((state) => state.syncStatus);
   const lastSyncedAt = useAppStore((state) => state.lastSyncedAt);
   const syncError = useAppStore((state) => state.syncError);
+  const isOnline = useAppStore((state) => state.isOnline);
+  const pendingWriteCount = useAppStore((state) => state.pendingWriteCount);
   const updateReminderSettings = useAppStore((state) => state.updateReminderSettings);
   const setTheme = useAppStore((state) => state.setTheme);
   const setDefaultDailyMinutes = useAppStore((state) => state.setDefaultDailyMinutes);
@@ -88,11 +90,14 @@ export function SettingsPage() {
           </div>
           <button
             onClick={() => void syncNow()}
-            className="rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white dark:bg-teal-500 dark:text-slate-950"
+            disabled={!isOnline}
+            className="rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50 dark:bg-teal-500 dark:text-slate-950"
           >
             Jetzt synchronisieren
           </button>
           <p className="text-sm text-slate-500">Status: {syncStatus}</p>
+          <p className="text-sm text-slate-500">Vorgemerkte Offline-Aenderungen: {pendingWriteCount}</p>
+          {!isOnline ? <p className="text-sm text-amber-600 dark:text-amber-300">Offline: Aenderungen werden lokal vorgemerkt und spaeter synchronisiert.</p> : null}
           <p className="text-sm text-slate-500">Letzter Sync: {lastSyncedAt ? new Date(lastSyncedAt).toLocaleString("de-DE") : "-"}</p>
           {syncError ? <p className="text-sm text-rose-600 dark:text-rose-300">{syncError}</p> : null}
           <div className="flex flex-wrap gap-2">

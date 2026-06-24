@@ -41,8 +41,7 @@ export function LoginPage({ mode = "login" }: LoginPageProps) {
             {isSignup ? "Account erstellen und loslegen." : "Willkommen zurück."}
           </h1>
           <p className="mt-5 max-w-md text-base leading-7 text-slate-600 dark:text-slate-300">
-            Mit Account nutzt du Cloud-Sync, KI-Coach, automatischen Lernplan und Fortschritt auf allen Geräten.
-            Ohne Login kannst du nur den Kalender mit Terminen ansehen.
+            Mit Account merkt sich Supabase deine Sitzung, synchronisiert deine Daten zwischen Geraeten und haelt die App nach dem Laden auch offline nutzbar.
           </p>
         </section>
 
@@ -67,8 +66,8 @@ export function LoginPage({ mode = "login" }: LoginPageProps) {
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-500">
             {isSignup
-              ? "Erstelle einen Account für Cloud-Sync und alle Funktionen."
-              : "Melde dich an, damit deine Daten synchronisiert werden."}
+              ? "Erstelle einen Account fuer Cloud-Sync, Offline-Cache und deinen Lernfortschritt auf mehreren Geraeten."
+              : "Deine Supabase Sitzung bleibt gespeichert und wird beim naechsten Start automatisch wiederhergestellt."}
           </p>
 
           {!hasSupabaseEnv || configIssue ? (

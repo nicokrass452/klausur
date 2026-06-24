@@ -41,7 +41,7 @@ export default function App() {
     const update = () => {
       setOnlineStatus(window.navigator.onLine);
       const store = useAppStore.getState();
-      if (window.navigator.onLine && store.pendingOfflineChanges && store.settings.cloudSyncEnabled) {
+      if (window.navigator.onLine && store.isAuthenticated && store.settings.cloudSyncEnabled) {
         store.syncNow();
       }
     };

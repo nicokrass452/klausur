@@ -3,7 +3,7 @@ export type CalendarMode = "week" | "month";
 export type TaskType = "learn" | "review" | "buffer";
 export type TaskStatus = "open" | "done" | "missed";
 export type MaterialType = "pdf" | "note" | "video";
-export type SyncStatus = "idle" | "syncing" | "error" | "success" | "pending_offline";
+export type SyncStatus = "idle" | "syncing" | "error" | "success" | "queued" | "pending_offline";
 
 export interface SyncableEntity {
   userId?: string;
@@ -138,7 +138,27 @@ export interface AppSnapshot {
   syncStatus: SyncStatus;
   lastSyncedAt?: string;
   syncError?: string;
-  pendingOfflineChanges?: boolean;
+  pendingWriteCount: number;
+}
+
+export type PendingWrite =
+  | { id: string; userId: string; table: "exams"; op: "upsert"; payload: Exam; createdAt: string }
+  | { id: string; userId: string; table: "topics"; op: "upsert"; payload: Topic; createdAt: string }
+  | { id: string; userId: string; table: "study_tasks"; op: "upsert"; payload: StudyTask; createdAt: string }
+  | { id: string; userId: string; table: "study_materials"; op: "upsert"; payload: StudyMaterial; createdAt: string }
+  | { id: string; userId: string; table: "user_stats"; op: "upsert"; payload: UserStats; createdAt: string }
+  | { id: string; userId: string; table: "focus_sessions"; op: "upsert"; payload: FocusSession; createdAt: string };
+
+export interface OfflineSnapshot {
+  exams: Exam[];
+  topics: Topic[];
+  studyTasks: StudyTask[];
+  materials: StudyMaterial[];
+  stats: UserStats;
+  settings: AppSettings;
+  user: UserProfile | null;
+  isAuthenticated: boolean;
+  lastSyncedAt?: string;
 }
 
 export interface CloudTableRow<T extends object> {

@@ -440,6 +440,18 @@ export async function syncStudyTask(task: StudyTask, userId: string): Promise<vo
   throwIfSupabaseError(error);
 }
 
+export async function syncStudyMaterial(material: StudyMaterial, userId: string): Promise<void> {
+  const client = requireSupabase();
+  const { error } = await client.from("study_materials").upsert(mapMaterialToRow(material, userId), { onConflict: "id" });
+  throwIfSupabaseError(error);
+}
+
+export async function syncFocusSession(session: FocusSession, userId: string): Promise<void> {
+  const client = requireSupabase();
+  const { error } = await client.from("focus_sessions").upsert(mapFocusSessionToRow(session, userId), { onConflict: "id" });
+  throwIfSupabaseError(error);
+}
+
 export async function syncUserStats(stats: UserStats, focusSessions: FocusSession[], badges: UserBadge[], userId: string): Promise<void> {
   const client = requireSupabase();
   const { error } = await client.from("user_stats").upsert(
