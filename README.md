@@ -54,6 +54,26 @@ VITE_AUTH_REDIRECT_URL=http://localhost:5177/dashboard
 VITE_DEV_SERVER_PORT=5177
 VITE_DEV_HMR_CLIENT_PORT=5177
 VITE_SENTRY_DSN=optional-sentry-dsn
+
+# Offline Read-Only Cache Access (Feature Flag, default: off)
+VITE_ENABLE_OFFLINE_READONLY=false
+VITE_OFFLINE_PUBLIC_KEY=
+```
+
+Server-only Werte gehoeren in Supabase Edge Function Secrets oder `.env.server`, nie in den Browser und nie mit `VITE_`:
+
+```text
+OFFLINE_READONLY_ENABLED=false
+OFFLINE_SIGNING_KEY=
+CLEANUP_CRON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+```
+
+**Production Guardrail:** Offline Read-Only Access ist vorbereitet, bleibt aber bis zur Staging-/Release-Readiness-Pruefung deaktiviert. In Production vorerst nicht setzen:
+
+```text
+VITE_ENABLE_OFFLINE_READONLY=true
+OFFLINE_READONLY_ENABLED=true
 ```
 
 ### Supabase einrichten
@@ -77,11 +97,14 @@ VITE_SENTRY_DSN=optional-sentry-dsn
 |--------|-----------|
 | **Gast** (ohne Account) | Nur Kalender-Vorschau mit Terminen |
 | **Eingeloggt** | Dashboard, Klausuren, Lernplan, Coach, Fokus, Analytics, Settings, Cloud-Sync |
+| **Offline Read-Only** (Feature Flag) | Letzter verschluesselter Snapshot, keine Bearbeitung, kein Supabase-Auth-Ersatz |
 
 - Registrierung: `/signup` (E-Mail oder Google)
 - Anmeldung: `/login`
 - Nach dem ersten Login: geführtes Onboarding-Tutorial (11 Schritte, alle Hauptfunktionen)
 - Auth-Session wird bei jedem Start serverseitig über Supabase validiert (kein vertrauenswürdiger Cache)
+
+- Offline Read-Only entsperrt nur lokal gespeicherte Daten und erzwingt Lesemodus an der Store-/Datenebene.
 
 ## Aktuelle Funktionen
 
@@ -120,7 +143,7 @@ Edge Function deployen:
 supabase login
 supabase link --project-ref <dein-project-ref>
 supabase secrets set GLM_API_KEY="<dein-zhipu-api-key>"
-supabase secrets set GLM_MODEL="glm-4-flash"
+supabase secrets set GLM_MODEL="glm-4.7-flash"
 supabase secrets set DEEPSEEK_API_KEY="<dein-deepseek-api-key>"
 supabase secrets set DEEPSEEK_MODEL="deepseek-v4-flash"
 supabase functions deploy ai-coach
@@ -136,12 +159,72 @@ supabase functions serve ai-coach --env-file ./supabase/.env.local
 
 ```text
 GLM_API_KEY=...
-GLM_MODEL=glm-4-flash
+GLM_MODEL=glm-4.7-flash
 DEEPSEEK_API_KEY=...
 DEEPSEEK_MODEL=deepseek-v4-flash
 ```
 
 **Wichtig:** `GLM_API_KEY` und `DEEPSEEK_API_KEY` nie in `.env`, `.env.example` oder als `VITE_*` eintragen.
+
+## Offline Read-Only Cache Access (Feature Flag)
+
+Offline Read-Only Access ist browser-bound und dient nur dazu, zuvor synchronisierte Daten lokal zu lesen, wenn Supabase nicht erreichbar ist. Es ist **kein** Offline-Supabase-Auth, keine hardwaregebundene Device Identity und kein Ersatz fuer Revocation-Pruefungen im Online-Betrieb.
+
+Status:
+
+- Client-Flag: `VITE_ENABLE_OFFLINE_READONLY=false` per Default.
+- Edge-Function-Flag: `OFFLINE_READONLY_ENABLED=false` per Default.
+- Production bleibt deaktiviert, bis Staging-/Release-Readiness bestanden ist.
+
+Registrierung:
+
+1. Der Browser erzeugt ein exportierbares ECDSA-P-256 Device-Keypair in IndexedDB.
+2. Die App berechnet `device_hash` als SHA-256 des SPKI Public Keys.
+3. `get-device-challenge` erstellt eine 5-Minuten-Challenge fuer den angemeldeten Supabase-User.
+4. `register-device` verifiziert Challenge-Signatur, Public-Key-Thumbprint und erstellt ein ES256 Offline Grant.
+5. Der Offline Grant wird lokal gespeichert und verschluesselt den letzten Sync-Snapshot.
+
+Cache-Schutz:
+
+- Snapshots werden mit AES-256-GCM verschluesselt.
+- Der Schluessel wird aus dem Offline Grant via PBKDF2 SHA-256 mit 100.000 Iterationen abgeleitet.
+- Das schuetzt gegen beilaufige Inspektion. Wenn Browser Storage inklusive Grant kopiert wird, kann der Cache weiterhin entschluesselt werden.
+
+Supabase Edge Functions:
+
+```powershell
+supabase secrets set OFFLINE_READONLY_ENABLED=false
+supabase secrets set OFFLINE_SIGNING_KEY="<base64url-pkcs8-p256-private-key>"
+supabase secrets set CLEANUP_CRON_KEY="<random-cron-secret>"
+supabase functions deploy get-device-challenge
+supabase functions deploy register-device
+supabase functions deploy revalidate-grant
+supabase functions deploy cleanup-expired-challenges
+```
+
+Cron/Vault:
+
+```sql
+select vault.create_secret('your-cleanup-cron-key', 'CLEANUP_CRON_KEY');
+alter database postgres set app.settings.supabase_url = 'https://your-project-ref.supabase.co';
+```
+
+Manual cleanup test uses `net.http_post` directly or `select public.invoke_cleanup_expired_challenges();`; do not use `cron.schedule('now')`.
+
+Release-readiness checklist for staging:
+
+- Registration success.
+- Replayed challenge rejected.
+- Device hash mismatch rejected.
+- Tampered grant rejected.
+- Wrong signature rejected.
+- Properly signed expired grant rejected.
+- Valid grant revalidates online.
+- Revoked grant returns `valid: false`.
+- Network failure returns `null` locally, not `false`.
+- Encrypted cache decrypts with the correct grant.
+- Encrypted cache fails with the wrong grant.
+- Offline mutation attempts fail at the data layer.
 
 ## Projektstruktur
 
