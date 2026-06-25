@@ -1,5 +1,5 @@
 import type { CoachMessage, Flashcard, QuizQuestion, StudyTask, Topic, UserStats } from "../types";
-import { getSupabaseRequestHeaders, supabase, supabaseAnonKey } from "../lib/supabase";
+import { getSupabaseRequestHeaders, supabase, supabaseAnonKey, supabaseUrl } from "../lib/supabase";
 
 type AiAction = "generateQuiz" | "generateFlashcards" | "optimizeStudyPlan" | "coachMessage" | "coachChat";
 type AiSource = "glm" | "deepseek" | "mock";
@@ -138,18 +138,29 @@ async function invokeAiCoach<T>(
 ): Promise<AiResult<T>> {
   try {
     if (!supabase) throw new Error("Supabase ist nicht konfiguriert.");
+    if (!supabaseUrl) throw new Error("Supabase URL fehlt. KI nutzt den Mock-Fallback.");
     if (!supabaseAnonKey) throw new Error("Supabase Anon Key fehlt. KI nutzt den Mock-Fallback.");
 
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError) throw sessionError;
     const accessToken = sessionData.session?.access_token;
 
-    const { data, error } = await supabase.functions.invoke("ai-coach", {
-      body: { action, payload },
-      headers: getSupabaseRequestHeaders(accessToken)
+    const response = await fetch(`${supabaseUrl}/functions/v1/ai-coach`, {
+      method: "POST",
+      headers: {
+        ...getSupabaseRequestHeaders(accessToken),
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ action, payload })
     });
 
-    if (error) throw error;
+    if (!response.ok) {
+      const error = new Error(`Edge Function HTTP ${response.status}`) as Error & { context?: Response };
+      error.context = response;
+      throw error;
+    }
+
+    const data = await response.json();
     const parsed = data as { data?: unknown; error?: unknown; fallback?: boolean; source?: AiSource } | null;
     if (parsed?.fallback && typeof parsed.error === "string") console.warn(parsed.error);
 
