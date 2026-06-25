@@ -2,7 +2,7 @@
 
 Klausurplaner ist eine mobile-first Progressive Web App für Schülerinnen und Schüler. Die App organisiert Klausuren, generiert Lernpläne, trackt Fortschritt und kombiniert Fokusmodus, Analytics, Gamification und einen KI-Coach.
 
-Die App ist **über das MVP hinaus gewachsen**: Supabase-Auth, Cloud-Sync, Gast-Vorschau und ein geführtes Onboarding sind implementiert. Für ein produktionsreifes Produkt fehlen noch Tests, echtes Offline-Verhalten, Push im Hintergrund und mehrere Backend-/Sync-Härtungen — siehe [Bekannte Probleme & offene Punkte](#bekannte-probleme--offene-punkte).
+Die App ist **über das MVP hinaus gewachsen**: Supabase-Auth, Cloud-Sync, Gast-Vorschau, geführtes Onboarding, Unit-Tests, Web-Push, Datei-Upload, Analytics-Export, iCal-Export, KI-Rate-Limit-Feedback und ein i18n-Grundgerüst sind implementiert. Für ein produktionsreifes Produkt bleiben noch größere Features wie Lerngruppen, vollständige i18n, KI-Kontext aus Materialien und Realtime-Sync — siehe [Bekannte Probleme & offene Punkte](#bekannte-probleme--offene-punkte).
 
 ## Stack
 
@@ -38,6 +38,18 @@ Produktionsbuild:
 ```powershell
 npm run build
 npm run preview
+```
+
+Tests ausführen:
+
+```powershell
+npm test
+```
+
+Typ-Check:
+
+```powershell
+npm run typecheck
 ```
 
 **Wichtig:** `VITE_*`-Variablen werden beim Build eingebettet. Für Deployments müssen sie in der CI/CD-Umgebung **vor** `npm run build` gesetzt sein. Nach Änderungen an `.env` den Dev-Server neu starten.
@@ -118,19 +130,21 @@ OFFLINE_READONLY_ENABLED=true
 - Klausuren mit Fach, Datum, Uhrzeit, Raum, Notizen, Schwierigkeit, Wissensstand, Tagesminuten
 - Themen mit Fortschritt in Prozent
 - Automatischer Lernplan (Prioritätsformel, 70/20/10, Spaced Repetition: Tag 1, 2, 5, 10, 18)
-- Manuelle Neuverteilung verpasster Aufgaben
+- Automatische + manuelle Neuverteilung verpasster Aufgaben
 - Lernmaterialien (Notizen, Links, PDFs) pro Klausur — Upload in Supabase Storage mit offline Fallback
+- iCal/Google-Calendar Export für Klausurtermine
 
 ### Produktivität & Motivation
 - Dashboard: nächste Klausur, Countdown, XP, Level, Streak, Fokuszeit
 - Kalender (Woche/Monat)
 - Pomodoro-Fokusmodus (25/5)
-- Analytics: Lernzeit, Fortschritt, Schwachstellen (Basis)
+- Analytics: Lernzeit, Fortschritt, Schwachstellen, CSV-Export, 7/14/30-Tage-XP-Trends
 - Gamification: XP, Level, Badges, Streak
 
 ### KI & Cloud
 - KI-Coach mit Modi: Coach, Quiz, Karteikarten, Plan, Erklären
 - GLM + DeepSeek über Supabase Edge Function `ai-coach` (Mock-Fallback lokal)
+- Proaktiver Hinweis auf aktiven KI-Provider + Rate-Limit-Feedback
 - Supabase Cloud-Sync (Push/Pull mit Konfliktauflösung nach `updatedAt`)
 - Browser-Benachrichtigungen + Web Push (Hintergrund) bei erteilter Permission
 
@@ -138,6 +152,8 @@ OFFLINE_READONLY_ENABLED=true
 - Mobile-first, Bottom-Navigation + Sidebar
 - Dark Mode
 - Überarbeitete Fortschrittsbalken, Segmented Controls, deutsche Umlaute
+- i18n-Grundgerüst (DE/EN) mit Sprachumschaltung
+- Barrierefreiheits-Pass: ARIA-Labels, Live-Regionen, Escape schließt Tutorial
 
 ## GLM KI mit DeepSeek-Fallback (Edge Function)
 
@@ -302,8 +318,9 @@ Bei Rotation müssen alle Push-Subscriptions neu abgeschlossen werden (User müs
 index.html
 package.json
 vite.config.ts
-supabase-schema.sql          # Postgres-Schema + RLS
-supabase/functions/ai-coach/ # Edge Function für KI
+supabase/
+  migrations/                # Postgres-Schema + RLS + Storage + Push
+  functions/                 # Edge Functions (ai-coach, subscribe-push, send-push, ...)
 src/
   main.tsx
   App.tsx
@@ -311,8 +328,10 @@ src/
   pages/                     # Dashboard, Calendar, Exams, Coach, …
   components/                # UI, AuthGuard, Tutorial, Navigation
   store/useAppStore.ts       # Zustand + Persist
-  services/                  # syncService, aiService, studyPlanGenerator
-  lib/                       # supabase, constants, navigation
+  services/                  # syncService, aiService, studyPlanGenerator, pushService, ...
+  utils/                     # icalExport, analyticsExport, dateUtils, ...
+  lib/                       # supabase, constants, navigation, i18n
+  locales/                   # de.ts, en.ts
   styles/globals.css
 public/
   manifest.json
