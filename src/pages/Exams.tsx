@@ -7,6 +7,7 @@ export function ExamsPage() {
   const allExams = useAppStore((state) => state.exams);
   const allTopics = useAppStore((state) => state.topics);
   const defaultDailyMinutes = useAppStore((state) => state.settings.defaultDailyMinutes);
+  const isOfflineReadOnly = useAppStore((state) => state.authMode === "offline-readonly");
   const exams = useMemo(() => allExams.filter((entry) => !entry.deletedAt), [allExams]);
   const topics = useMemo(() => allTopics.filter((entry) => !entry.deletedAt), [allTopics]);
   const [subject, setSubject] = useState("");
@@ -37,6 +38,7 @@ export function ExamsPage() {
             setDailyMinutes(defaultDailyMinutes);
           }}
         >
+          <fieldset disabled={isOfflineReadOnly} className="contents disabled:opacity-60">
           <label className="space-y-2 text-sm font-medium text-slate-600 dark:text-slate-300">
             Fach
             <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950" value={subject} onChange={(event) => setSubject(event.target.value)} required />
@@ -72,6 +74,7 @@ export function ExamsPage() {
           <button className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white dark:bg-teal-500 dark:text-slate-950 md:col-span-2" type="submit">
             Klausur speichern
           </button>
+          </fieldset>
         </form>
       </section>
 

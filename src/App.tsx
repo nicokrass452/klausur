@@ -27,8 +27,17 @@ export default function App() {
     }
 
     void resolveAuthUser()
-      .then((profile) => setAuthSession(profile))
-      .catch(() => setAuthSession(null));
+      .then((profile) => {
+        if (profile || useAppStore.getState().authMode !== "offline-readonly") {
+          setAuthSession(profile);
+        }
+      })
+      .catch(() => {
+        if (useAppStore.getState().authMode !== "offline-readonly") {
+          setAuthSession(null);
+        }
+      })
+      .finally(() => setAuthReady(true));
 
     const unsubscribe = onAuthStateChange((_session, profile) => {
       setAuthSession(profile);

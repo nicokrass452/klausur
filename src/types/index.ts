@@ -5,6 +5,8 @@ export type TaskStatus = "open" | "done" | "missed";
 export type MaterialType = "pdf" | "note" | "video";
 export type SyncStatus = "idle" | "syncing" | "error" | "success" | "queued" | "pending_offline";
 
+export type AuthMode = 'online' | 'offline-readonly' | 'signed-out';
+
 export interface SyncableEntity {
   userId?: string;
   updatedAt: string;
@@ -92,6 +94,20 @@ export interface UserProfile {
   updatedAt: string;
 }
 
+export type User =
+  | (UserProfile & { source: "online" })
+  | {
+      id: string;
+      source: "offline_grant";
+      email?: undefined;
+      fullName?: undefined;
+      avatarUrl?: undefined;
+      provider?: undefined;
+      cloudSyncEnabled?: undefined;
+      createdAt?: undefined;
+      updatedAt?: undefined;
+    };
+
 export interface ReminderSettings {
   dailyReminder: boolean;
   todayLearningReminder: boolean;
@@ -133,7 +149,7 @@ export interface AppSnapshot {
   materials: StudyMaterial[];
   stats: UserStats;
   settings: AppSettings;
-  user: UserProfile | null;
+  user: User | null;
   isAuthenticated: boolean;
   syncStatus: SyncStatus;
   lastSyncedAt?: string;
@@ -156,7 +172,7 @@ export interface OfflineSnapshot {
   materials: StudyMaterial[];
   stats: UserStats;
   settings: AppSettings;
-  user: UserProfile | null;
+  user: User | null;
   isAuthenticated: boolean;
   lastSyncedAt?: string;
 }

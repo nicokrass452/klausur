@@ -4,7 +4,7 @@ import { useAppStore } from "./useAppStore";
 describe("useAppStore", () => {
   beforeEach(() => {
     // Clear the store before each test
-    useAppStore.setState({ exams: [], topics: [], materials: [], studyTasks: [] });
+    useAppStore.setState({ exams: [], topics: [], materials: [], studyTasks: [], authMode: "signed-out" });
   });
 
   it("should add a new exam and generate tasks and topics if not provided", () => {
@@ -56,5 +56,21 @@ describe("useAppStore", () => {
     // removeExam performs a soft delete by setting deletedAt
     expect(state.exams.length).toBe(1);
     expect(state.exams[0].deletedAt).toBeDefined();
+  });
+
+  it("rejects mutation attempts in offline read-only mode at the data layer", () => {
+    useAppStore.setState({ authMode: "offline-readonly" });
+
+    expect(() => useAppStore.getState().addExam({
+      subject: "Chemistry",
+      date: "2024-12-01",
+      time: "10:00",
+      room: "C1",
+      notes: "",
+      difficulty: 3,
+      knowledgeLevel: 2,
+      color: "#00ff00",
+      dailyMinutes: 30
+    })).toThrow("Cannot modify data in offline read-only mode");
   });
 });

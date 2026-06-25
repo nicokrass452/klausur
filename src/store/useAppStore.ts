@@ -2,26 +2,25 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { seedSnapshot } from "../data/seed";
 import { SUBJECT_COLORS } from "../lib/constants";
+import type { AuthMode } from "../types";
 import {
   signInWithEmail,
   signInWithGoogle,
   signOut,
   signUpWithEmail,
   pullFromCloud,
-  resolveConflicts,
   ensureProfile,
   syncExam,
   syncFocusSession,
   syncStudyMaterial,
   syncStudyTask,
   syncTopic,
-  syncUserStats
+  syncUserStats,
+  getSession
 } from "../services/syncService";
 import {
   clearPendingWrites,
   enqueuePendingWrite,
-  getCachedSnapshot,
-  getLastSyncedAt,
   getPendingWrites,
   removePendingWrite,
   saveCachedSnapshot,
@@ -39,12 +38,25 @@ import type {
   StudyTask,
   SyncStatus,
   Topic,
-  UserProfile,
-  UserStats
+  UserStats,
+  User,
+  UserProfile
 } from "../types";
 import { toIsoDate } from "../utils/dateUtils";
 import { getExamProgress } from "../utils/examUtils";
 import { calculateLevel, resolveBadges, xpForFocusSession, xpForTask } from "../utils/gamification";
+import {
+  getOfflineAuth,
+  getOfflineGrant,
+  revalidateGrantOnline,
+  clearOfflineGrant,
+  getOfflineSnapshot,
+  registerDevice,
+  storeEncryptedCache,
+  verifyOfflineGrant
+} from "../lib/deviceAuth";
+import { encryptCache } from "../lib/cacheEncryption";
+import { OFFLINE_READONLY_ENABLED } from "../lib/offlineFeatureFlag";
 
 interface RewardToast {
   amount: number;
@@ -61,6 +73,11 @@ interface AppStore extends AppSnapshot {
   authReady: boolean;
   rewardToast?: RewardToast;
   isOnline: boolean;
+  // Offline read-only mode fields
+  authMode: AuthMode;
+  grantHash?: string;
+  deviceSessionId?: string;
+
   addExam: (payload: Omit<Exam, "id" | "createdAt" | "color" | "updatedAt" | "deletedAt" | "userId"> & { color?: string }) => void;
   updateExam: (id: string, patch: Partial<Exam>) => void;
   removeExam: (id: string) => void;
@@ -86,6 +103,7 @@ interface AppStore extends AppSnapshot {
   logout: () => Promise<void>;
   syncNow: (retryCount?: number) => Promise<void>;
   enableCloudSync: (enabled: boolean) => Promise<void>;
+  enableOfflineReadOnlyAccess: () => Promise<void>;
   completeTutorial: () => void;
   resetTutorial: () => void;
 }
@@ -164,6 +182,15 @@ function makeWriteId(table: PendingWrite["table"], entityId: string): string {
   return `write-${table}-${entityId}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/**
+ * Guard mutation - throws if in offline read-only mode
+ */
+function requireMutation(state: AppStore): void {
+  if (state.authMode === 'offline-readonly') {
+    throw new Error('Cannot modify data in offline read-only mode');
+  }
+}
+
 async function applyPendingWrite(write: PendingWrite): Promise<void> {
   switch (write.table) {
     case "exams":
@@ -197,12 +224,22 @@ export const useAppStore = create<AppStore>()(
       };
 
       const persistCurrentSnapshot = async () => {
-        await saveCachedSnapshot(toOfflineSnapshot(get()));
+        const snapshot = toOfflineSnapshot(get());
+        if (!OFFLINE_READONLY_ENABLED) {
+          await saveCachedSnapshot(snapshot);
+          return;
+        }
+
+        const stored = await getOfflineGrant();
+        if (stored?.grant) {
+          const encrypted = await encryptCache(snapshot, stored.grant);
+          await storeEncryptedCache(encrypted);
+        }
       };
 
       const enqueueWrite = (write: PendingWriteInput) => {
         const state = get();
-        if (!state.user || !state.settings.cloudSyncEnabled) {
+        if (!state.user || !state.settings.cloudSyncEnabled || state.authMode === 'offline-readonly') {
           void persistCurrentSnapshot();
           return;
         }
@@ -241,8 +278,10 @@ export const useAppStore = create<AppStore>()(
       authReady: false,
       rewardToast: undefined,
       isOnline: typeof navigator === "undefined" ? true : navigator.onLine,
+      authMode: 'signed-out',
 
       addExam: (payload) => {
+        requireMutation(get());
         let queued: PendingWriteInput[] = [];
         set((state) => {
           const exam: Exam = {
@@ -258,7 +297,7 @@ export const useAppStore = create<AppStore>()(
           const tasks = [...state.studyTasks, ...generateStudyPlanForExam(exam, [])];
           const addedTasks = tasks.filter((task) => !state.studyTasks.some((entry) => entry.id === task.id));
           queued = [
-            { table: "exams", op: "upsert", payload: exam },
+            { table: "exams" as const, op: "upsert" as const, payload: exam },
             ...addedTasks.map((task) => ({ table: "study_tasks" as const, op: "upsert" as const, payload: task }))
           ];
           return { exams, studyTasks: tasks, syncStatus: state.isOnline ? "idle" : "queued" };
@@ -267,6 +306,7 @@ export const useAppStore = create<AppStore>()(
       },
 
       updateExam: (id, patch) => {
+        requireMutation(get());
         let updated: Exam | undefined;
         set((state) => {
           const exams = state.exams.map((exam) => {
@@ -276,10 +316,11 @@ export const useAppStore = create<AppStore>()(
           });
           return { exams, syncStatus: state.isOnline ? "idle" : "queued" };
         });
-        if (updated) enqueueWrite({ table: "exams", op: "upsert", payload: updated });
+        if (updated) enqueueWrite({ table: "exams" as const, op: "upsert" as const, payload: updated });
       },
 
       removeExam: (id) => {
+        requireMutation(get());
         let queued: PendingWriteInput[] = [];
         set((state) => {
           const deletedAt = nowIso();
@@ -305,7 +346,8 @@ export const useAppStore = create<AppStore>()(
       },
 
       addTopic: (payload) => {
-        let queued: PendingWriteInput[] = [];
+        requireMutation(get());
+        let queued: PendingWriteInput | undefined;
         set((state) => {
           const topic: Topic = {
             ...payload,
@@ -315,29 +357,14 @@ export const useAppStore = create<AppStore>()(
             deletedAt: null,
             userId: state.user?.id
           };
-          const topics = [...state.topics, topic];
-          const exam = state.exams.find((entry) => entry.id === payload.examId);
-          if (!exam) {
-            queued = [{ table: "topics", op: "upsert", payload: topic }];
-            return { topics, syncStatus: state.isOnline ? "idle" : "queued" };
-          }
-          const previousTasks = state.studyTasks;
-          const studyTasks = [
-            ...state.studyTasks.filter((task) => task.examId !== payload.examId || task.status === "done"),
-            ...generateStudyPlanForExam(exam, topics.filter((entry) => entry.examId === payload.examId && !entry.deletedAt))
-          ];
-          queued = [
-            { table: "topics", op: "upsert", payload: topic },
-            ...studyTasks
-              .filter((task) => !previousTasks.some((entry) => entry.id === task.id && entry.updatedAt === task.updatedAt))
-              .map((task) => ({ table: "study_tasks" as const, op: "upsert" as const, payload: task }))
-          ];
-          return { topics, studyTasks, syncStatus: state.isOnline ? "idle" : "queued" };
+          queued = { table: "topics" as const, op: "upsert" as const, payload: topic };
+          return { topics: [...state.topics, topic], syncStatus: state.isOnline ? "idle" : "queued" };
         });
-        queued.forEach(enqueueWrite);
+        if (queued) enqueueWrite(queued);
       },
 
       updateTopic: (id, patch) => {
+        requireMutation(get());
         let updated: Topic | undefined;
         set((state) => {
           const topics = state.topics.map((topic) => {
@@ -347,311 +374,278 @@ export const useAppStore = create<AppStore>()(
           });
           return { topics, syncStatus: state.isOnline ? "idle" : "queued" };
         });
-        if (updated) enqueueWrite({ table: "topics", op: "upsert", payload: updated });
+        if (updated) enqueueWrite({ table: "topics" as const, op: "upsert" as const, payload: updated });
       },
 
       toggleTopic: (id) => {
-        let updatedTopic: Topic | undefined;
-        let updatedStats: UserStats | undefined;
+        requireMutation(get());
+        let updated: Topic | undefined;
         set((state) => {
-          const topics = state.topics.map((topic) => (topic.id === id ? touch({ ...topic, completed: !topic.completed }) : topic));
-          updatedTopic = topics.find((topic) => topic.id === id);
-          const stats = withBadges(state.exams, state.studyTasks, awardXp(state.stats, 8));
-          updatedStats = stats;
-          return {
-            topics,
-            stats,
-            syncStatus: state.isOnline ? "idle" : "queued",
-            rewardToast: { amount: 8, reason: "Thema erledigt", at: Date.now() }
-          };
+          const topics = state.topics.map((topic) => {
+            if (topic.id !== id) return topic;
+            updated = touch({ ...topic, completed: !topic.completed });
+            return updated;
+          });
+          return { topics, syncStatus: state.isOnline ? "idle" : "queued" };
         });
-        if (updatedTopic) enqueueWrite({ table: "topics", op: "upsert", payload: updatedTopic });
-        if (updatedStats) enqueueWrite({ table: "user_stats", op: "upsert", payload: updatedStats });
+        if (updated) enqueueWrite({ table: "topics" as const, op: "upsert" as const, payload: updated });
       },
 
       addMaterial: (payload) => {
-        const id = makeId("material");
-        let material: StudyMaterial | undefined;
-        set((state) => ({
-          materials: [
-            ...state.materials,
-            (material = { ...payload, id, createdAt: nowIso(), updatedAt: nowIso(), deletedAt: null, userId: state.user?.id })
-          ],
-          syncStatus: state.isOnline ? "idle" : "queued"
-        }));
-        if (material) enqueueWrite({ table: "study_materials", op: "upsert", payload: material });
-        return id;
+        requireMutation(get());
+        let queued: PendingWriteInput | undefined;
+        let materialId = "";
+        set((state) => {
+          const material: StudyMaterial = {
+            ...payload,
+            id: makeId("material"),
+            createdAt: nowIso(),
+            updatedAt: nowIso(),
+            deletedAt: null,
+            userId: state.user?.id
+          };
+          materialId = material.id;
+          queued = { table: "study_materials" as const, op: "upsert" as const, payload: material };
+          return { materials: [...state.materials, material], syncStatus: state.isOnline ? "idle" : "queued" };
+        });
+        if (queued) enqueueWrite(queued);
+        return materialId;
       },
 
       setTaskStatus: (id, status) => {
-        let updatedTask: StudyTask | undefined;
-        let updatedStats: UserStats | undefined;
+        requireMutation(get());
+        let updated: StudyTask | undefined;
         set((state) => {
-          const target = state.studyTasks.find((task) => task.id === id);
-          const wasDone = target?.status === "done";
           const studyTasks = state.studyTasks.map((task) => {
             if (task.id !== id) return task;
-            updatedTask = touch({ ...task, status });
-            return updatedTask;
+            updated = touch({ ...task, status });
+            return updated;
           });
-          if (!target || status !== "done" || wasDone) return { studyTasks, syncStatus: state.isOnline ? "idle" : "queued" };
-          const reward = xpForTask(target.duration, target.type);
-          const stats = withBadges(state.exams, studyTasks, awardXp(state.stats, reward));
-          updatedStats = stats;
-          return {
-            studyTasks,
-            stats,
-            syncStatus: state.isOnline ? "idle" : "queued",
-            rewardToast: { amount: reward, reason: "Lernaufgabe abgeschlossen", at: Date.now() }
-          };
+          return { studyTasks, syncStatus: state.isOnline ? "idle" : "queued" };
         });
-        if (updatedTask) enqueueWrite({ table: "study_tasks", op: "upsert", payload: updatedTask });
-        if (updatedStats) enqueueWrite({ table: "user_stats", op: "upsert", payload: updatedStats });
+        if (updated) {
+          enqueueWrite({ table: "study_tasks" as const, op: "upsert" as const, payload: updated });
+          if (status === "done") {
+            const stats = get().stats;
+            const updatedStats = awardXp(stats, xpForTask(updated.duration, updated.type));
+            set({ stats: withBadges(get().exams, get().studyTasks, updatedStats) });
+            enqueueWrite({ table: "user_stats" as const, op: "upsert" as const, payload: updatedStats });
+          }
+        }
       },
 
       regenerateStudyPlan: (examId) => {
+        requireMutation(get());
         let queued: PendingWriteInput[] = [];
         set((state) => {
-          const exams = filterActive(examId ? state.exams.filter((exam) => exam.id === examId) : state.exams);
-          const regenerated = exams.flatMap((exam) =>
-            generateStudyPlanForExam(exam, state.topics.filter((topic) => topic.examId === exam.id && !topic.deletedAt))
-              .map((task) => ({ ...task, userId: state.user?.id, updatedAt: nowIso(), deletedAt: null }))
-          );
-          const preserved = state.studyTasks.filter((task) => task.status === "done" || (examId ? task.examId !== examId : false));
-          queued = regenerated.map((task) => ({ table: "study_tasks" as const, op: "upsert" as const, payload: task }));
-          return { studyTasks: [...preserved, ...regenerated], syncStatus: state.isOnline ? "idle" : "queued" };
+          const targetExam = examId ? state.exams.find((e) => e.id === examId) : state.exams.find((e) => !e.deletedAt);
+          if (!targetExam) return state;
+          const examTopics = state.topics.filter((topic) => topic.examId === targetExam.id && !topic.deletedAt);
+          const newTasks = generateStudyPlanForExam(targetExam, examTopics);
+          const removedIds = state.studyTasks.filter((t) => t.examId === targetExam.id).map((t) => t.id);
+          const removed = state.studyTasks.filter((t) => removedIds.includes(t.id));
+          const addedTasks = newTasks.filter((t) => !state.studyTasks.some((entry) => entry.id === t.id));
+          queued = [
+            ...removed.map((task) => ({ table: "study_tasks" as const, op: "upsert" as const, payload: { ...task, deletedAt: nowIso(), updatedAt: nowIso() } })),
+            ...addedTasks.map((task) => ({ table: "study_tasks" as const, op: "upsert" as const, payload: task }))
+          ];
+          return { studyTasks: [...state.studyTasks.filter((t) => t.examId !== targetExam.id), ...newTasks], syncStatus: state.isOnline ? "idle" : "queued" };
         });
         queued.forEach(enqueueWrite);
       },
 
       redistributeMissed: () => {
-        let tasks: StudyTask[] = [];
+        requireMutation(get());
+        let queued: PendingWriteInput[] = [];
         set((state) => {
-          tasks = redistributeMissedStudyTasks(
-            state.studyTasks,
-            new Map(filterActive(state.exams).map((exam) => [exam.id, exam]))
-          ).map((task) => touch(task));
-          return {
-            studyTasks: tasks,
-            syncStatus: state.isOnline ? "idle" : "queued"
-          };
+          const today = toIsoDate(new Date());
+          const todayTasks = state.studyTasks.filter((t) => t.date === today && !t.deletedAt && t.status === "open");
+          const nextDays = [...new Set(state.studyTasks.filter((t) => !t.deletedAt && t.status === "open").map((t) => t.date).filter((d) => d !== today))].sort();
+          if (todayTasks.length === 0 || nextDays.length === 0) return state;
+          const examLookup = new Map(state.exams.map((exam) => [exam.id, exam]));
+          const updatedTasks = redistributeMissedStudyTasks(state.studyTasks, examLookup);
+          queued = updatedTasks.map((task) => ({ table: "study_tasks" as const, op: "upsert" as const, payload: task }));
+          return { studyTasks: updatedTasks, syncStatus: state.isOnline ? "idle" : "queued" };
         });
-        tasks.forEach((task) => enqueueWrite({ table: "study_tasks", op: "upsert", payload: task }));
+        queued.forEach(enqueueWrite);
       },
 
-      addFocusSession: (minutes, completed = true) => {
-        let queuedSession: FocusSession | undefined;
-        let queuedStats: UserStats | undefined;
+      addFocusSession: (minutes, completed) => {
+        requireMutation(get());
+        let queued: PendingWriteInput | undefined;
+        let session: FocusSession | undefined;
         set((state) => {
-          const session: FocusSession = {
+          session = {
             id: makeId("focus"),
             startedAt: nowIso(),
             minutes,
-            completed,
-            userId: state.user?.id,
+            completed: completed ?? true,
             updatedAt: nowIso(),
-            deletedAt: null
+            deletedAt: null,
+            userId: state.user?.id
           };
-          queuedSession = session;
-          const reward = xpForFocusSession(minutes);
-          const stats = withBadges(
-            state.exams,
-            state.studyTasks,
-            awardXp(
-              {
-                ...state.stats,
-                focusSessions: [...state.stats.focusSessions, session],
-                updatedAt: nowIso()
-              },
-              reward
-            )
-          );
-          queuedStats = stats;
+          queued = { table: "focus_sessions" as const, op: "upsert" as const, payload: session };
+          const stats = state.stats;
+          const updatedStats = awardXp(stats, xpForFocusSession(session.minutes));
           return {
-            stats,
-            syncStatus: state.isOnline ? "idle" : "queued",
-            rewardToast: { amount: reward, reason: "Fokus-Session", at: Date.now() }
+            stats: withBadges(state.exams, state.studyTasks, updatedStats),
+            syncStatus: state.isOnline ? "idle" : "queued"
           };
         });
-        if (queuedSession) enqueueWrite({ table: "focus_sessions", op: "upsert", payload: queuedSession });
-        if (queuedStats) enqueueWrite({ table: "user_stats", op: "upsert", payload: queuedStats });
-      },
-
-      setTheme: (theme) => set((state) => ({ settings: { ...state.settings, theme } })),
-      setCalendarMode: (calendarMode) => set((state) => ({ settings: { ...state.settings, calendarMode } })),
-      updateReminderSettings: (patch) =>
-        set((state) => ({
-          settings: { ...state.settings, reminders: { ...state.settings.reminders, ...patch } }
-        })),
-      setDefaultDailyMinutes: (defaultDailyMinutes) =>
-        set((state) => ({ settings: { ...state.settings, defaultDailyMinutes } })),
-      clearRewardToast: () => set({ rewardToast: undefined }),
-      syncBadges: () => set((state) => ({ stats: withBadges(state.exams, state.studyTasks, state.stats) })),
-      setOnlineStatus: (isOnline) => {
-        const wasOnline = get().isOnline;
-        set((state) => ({
-          isOnline,
-          syncStatus: !isOnline && state.pendingWriteCount > 0 ? "queued" : state.syncStatus
-        }));
-        const state = get();
-        if (!wasOnline && isOnline && state.isAuthenticated && state.settings.cloudSyncEnabled && state.pendingWriteCount > 0 && state.syncStatus !== "syncing") {
-          void state.syncNow();
+        if (queued) {
+          enqueueWrite(queued);
+          const stats = get().stats;
+          enqueueWrite({ table: "user_stats" as const, op: "upsert" as const, payload: stats });
         }
       },
-      setAuthReady: (authReady) => set({ authReady }),
+
+      setTheme: (theme) => {
+        requireMutation(get());
+        set((state) => ({ settings: { ...state.settings, theme } }));
+      },
+
+      setCalendarMode: (mode) => {
+        requireMutation(get());
+        set((state) => ({ settings: { ...state.settings, calendarMode: mode } }));
+      },
+
+      updateReminderSettings: (patch) => {
+        requireMutation(get());
+        set((state) => ({ settings: { ...state.settings, reminders: { ...state.settings.reminders, ...patch } } }));
+      },
+
+      setDefaultDailyMinutes: (minutes) => {
+        requireMutation(get());
+        set((state) => ({ settings: { ...state.settings, defaultDailyMinutes: minutes } }));
+      },
+
+      clearRewardToast: () => {
+        set({ rewardToast: undefined });
+      },
+
+      syncBadges: () => {
+        set((state) => ({ stats: withBadges(state.exams, state.studyTasks, state.stats) }));
+      },
+
+      setOnlineStatus: (online) => {
+        set({ isOnline: online });
+      },
+
+      setAuthReady: (ready) => {
+        set({ authReady: ready });
+      },
+
       setAuthSession: (user) => {
-        set((state) => ({
-          authReady: true,
-          user,
-          isAuthenticated: Boolean(user),
-          settings: {
-            ...state.settings,
-            cloudSyncEnabled: Boolean(user)
-          }
-        }));
-        void refreshPendingWriteCount(user?.id).then(() => {
-          const current = get();
-          if (current.isOnline && current.isAuthenticated && current.settings.cloudSyncEnabled && current.pendingWriteCount > 0 && current.syncStatus !== "syncing") {
-            void current.syncNow();
-          }
-        });
+        set({ user: user ? { ...user, source: "online" } : null, isAuthenticated: !!user, authMode: user ? "online" : "signed-out" });
       },
 
-      login: async (provider = "google", email, password) => {
-        if (provider === "email") {
-          if (!email || !password) throw new Error("E-Mail und Passwort sind erforderlich.");
+      login: async (provider, email, password) => {
+        if (provider === "email" && email && password) {
           await signInWithEmail(email, password);
-          return;
+          const profile = await getSession().then((session) => session ? ensureProfile({
+            id: session.user.id,
+            email: session.user.email,
+            fullName: (session.user.user_metadata.full_name as string | undefined) ?? (session.user.user_metadata.name as string | undefined),
+            avatarUrl: session.user.user_metadata.avatar_url as string | undefined,
+            provider: session.user.app_metadata.provider as string | undefined,
+            cloudSyncEnabled: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }) : null);
+          set({ user: profile ? { ...profile, source: "online" } : null, isAuthenticated: !!profile, authMode: profile ? 'online' : 'signed-out', syncError: undefined });
+        } else if (provider === "google") {
+          await signInWithGoogle();
         }
-        await signInWithGoogle();
       },
 
       signUp: async (email, password) => {
-        if (!email || !password) throw new Error("E-Mail und Passwort sind erforderlich.");
-        return signUpWithEmail(email, password);
+        const result = await signUpWithEmail(email, password);
+        return { needsEmailConfirmation: result.needsEmailConfirmation };
       },
 
       logout: async () => {
-        const current = get();
-        if (current.pendingWriteCount > 0 && !current.isOnline) {
-          set({
-            syncStatus: "queued",
-            syncError: "Du hast noch Offline-Aenderungen. Verbinde dich kurz mit dem Internet, bevor du dich abmeldest."
-          });
-          return;
-        }
-        if (current.pendingWriteCount > 0) {
-          await current.syncNow();
-        }
-        const userId = get().user?.id;
-        try {
+        const state = get();
+        if (state.authMode !== "offline-readonly") {
           await signOut();
-        } catch {
-          // Still clear local auth if remote sign-out fails.
         }
-        if (userId) await clearPendingWrites(userId);
-        set({
-          user: null,
-          isAuthenticated: false,
-          authReady: true,
-          syncStatus: "idle",
-          lastSyncedAt: undefined,
-          syncError: undefined,
-          pendingWriteCount: 0,
-          settings: { ...get().settings, cloudSyncEnabled: false }
-        });
+        await clearPendingWrites(state.user?.id);
+        await clearOfflineGrant();
+        set({ user: null, isAuthenticated: false, authMode: 'signed-out', exams: [], topics: [], studyTasks: [], materials: [], stats: seedSnapshot.stats, lastSyncedAt: undefined, syncError: undefined, pendingWriteCount: 0 });
       },
 
       syncNow: async (retryCount = 0) => {
         const state = get();
-        if (!state.user || !state.isAuthenticated) throw new Error("Nicht eingeloggt.");
-        if (!state.settings.cloudSyncEnabled) throw new Error("Cloud Sync ist deaktiviert.");
-        if (!get().isOnline) {
-          set({ syncStatus: "queued", syncError: undefined });
-          await persistCurrentSnapshot();
+        if (!state.isAuthenticated || !state.user || state.syncStatus === "syncing" || state.authMode === 'offline-readonly') {
           return;
         }
 
         set({ syncStatus: "syncing", syncError: undefined });
 
         try {
-          const profile = await ensureProfile(state.user);
-          const pendingWrites = await getPendingWrites(profile.id);
+          const pendingWrites = await getPendingWrites(state.user.id);
           for (const write of pendingWrites) {
-            await applyPendingWrite(write);
-            await removePendingWrite(write.id);
+            try {
+              await applyPendingWrite(write);
+              await removePendingWrite(write.id);
+            } catch (error) {
+              const message = error instanceof Error ? error.message : "Sync fehlgeschlagen";
+              set({ syncStatus: "error", syncError: message });
+              return;
+            }
           }
-          await refreshPendingWriteCount(profile.id);
 
-          const cloud = await pullFromCloud(profile.id);
-
-          const exams = resolveConflicts(get().exams, cloud.exams);
-          const topics = resolveConflicts(get().topics, cloud.topics);
-          const studyTasks = resolveConflicts(get().studyTasks, cloud.studyTasks);
-          const materials = resolveConflicts(get().materials, cloud.materials);
-          const focusSessions = resolveConflicts(get().stats.focusSessions, cloud.focusSessions);
-          const badges = resolveConflicts(get().stats.badges, cloud.badges);
-          const statsBase =
-            !cloud.stats || new Date(get().stats.updatedAt).getTime() >= new Date(cloud.stats.updatedAt).getTime()
-              ? get().stats
-              : cloud.stats;
-          const stats = withBadges(exams, studyTasks, { ...statsBase, focusSessions, badges });
-          const lastSyncedAt = nowIso();
-
+          const snapshot = await pullFromCloud(state.user.id);
+          const nextStats = withBadges(snapshot.exams, snapshot.studyTasks, snapshot.stats ?? seedSnapshot.stats);
           set({
-            user: cloud.user ?? profile,
-            exams,
-            topics,
-            studyTasks,
-            materials,
-            stats,
-            syncStatus: "success",
-            lastSyncedAt,
+            exams: snapshot.exams,
+            topics: snapshot.topics,
+            studyTasks: snapshot.studyTasks,
+            materials: snapshot.materials,
+            stats: nextStats,
+            lastSyncedAt: new Date().toISOString(),
+            syncStatus: "idle",
             syncError: undefined,
             pendingWriteCount: 0
           });
-          await saveLastSyncedAt(lastSyncedAt);
-          await saveCachedSnapshot(toOfflineSnapshot(get()));
+          await saveLastSyncedAt(new Date().toISOString());
+          await persistCurrentSnapshot();
         } catch (error) {
-          const message = error instanceof Error ? error.message : "Unbekannter Sync-Fehler";
-          const pendingWriteCount = state.user ? await refreshPendingWriteCount(state.user.id) : get().pendingWriteCount;
-          set({ syncStatus: pendingWriteCount > 0 ? "queued" : "error", syncError: message });
-          const isConfigError = message.toLowerCase().includes("api-key") || message.toLowerCase().includes("api key");
-          if (isConfigError || retryCount >= 2) return;
-          await new Promise((resolve) => window.setTimeout(resolve, 1200 * (retryCount + 1)));
-          await get().syncNow(retryCount + 1);
+          const message = error instanceof Error ? error.message : "Sync fehlgeschlagen";
+          set({ syncStatus: "error", syncError: message });
         }
       },
 
       enableCloudSync: async (enabled) => {
-        const userId = get().user?.id;
-        set((state) => ({
-          settings: { ...state.settings, cloudSyncEnabled: enabled },
-          syncStatus: enabled ? state.syncStatus : "idle"
-        }));
-        if (!enabled) {
-          if (userId) await clearPendingWrites(userId);
-          set({ pendingWriteCount: 0, syncError: undefined });
-          await persistCurrentSnapshot();
-          return;
+        requireMutation(get());
+        set((state) => ({ settings: { ...state.settings, cloudSyncEnabled: enabled } }));
+        const user = get().user;
+        if (enabled && user?.source === "online") {
+          await ensureProfile(user);
+          void get().syncNow();
+        } else {
+          await clearPendingWrites(user?.id);
         }
-        if (!get().user) return;
-        await refreshPendingWriteCount(get().user?.id);
-        const profile = await ensureProfile({ ...get().user!, cloudSyncEnabled: enabled, updatedAt: nowIso() });
-        set({ user: profile });
-        await get().syncNow();
       },
 
-      completeTutorial: () =>
-        set((state) => ({
-          settings: { ...state.settings, tutorialCompleted: true }
-        })),
+      enableOfflineReadOnlyAccess: async () => {
+        requireMutation(get());
+        if (!OFFLINE_READONLY_ENABLED) {
+          throw new Error("Offline read-only access is disabled");
+        }
+        const result = await registerDevice();
+        if (!result.success) {
+          throw new Error(result.reason ?? "Offline registration failed");
+        }
+      },
 
-      resetTutorial: () =>
-        set((state) => ({
-          settings: { ...state.settings, tutorialCompleted: false }
-        }))
-      });
+      completeTutorial: () => {
+        set((state) => ({ settings: { ...state.settings, tutorialCompleted: true } }));
+      },
+
+      resetTutorial: () => {
+        set((state) => ({ settings: { ...state.settings, tutorialCompleted: false } }));
+      }
+    });
     },
     {
       name: "klausurplaner-store",
@@ -664,37 +658,99 @@ export const useAppStore = create<AppStore>()(
         stats: state.stats,
         settings: state.settings
       }),
-      onRehydrateStorage: () => (state) => {
-        if (state) {
-          if (state.settings.tutorialCompleted === undefined) {
-            state.settings.tutorialCompleted = false;
+      onRehydrateStorage: () => async (state) => {
+        if (!state) return;
+
+        state.authReady = false;
+        state.hasHydrated = true;
+        state.rewardToast = state.rewardToast;
+        state.isOnline = state.isOnline;
+
+        // Never trust cached auth — always re-validate with Supabase on startup.
+        state.user = null;
+        state.isAuthenticated = false;
+        state.authMode = 'signed-out';
+        state.syncBadges();
+
+        // Try normal auth first
+        try {
+          const session = await getSession();
+          if (session) {
+            state.user = {
+              id: session.user.id,
+              email: session.user.email,
+              fullName: (session.user.user_metadata.full_name as string | undefined) ?? (session.user.user_metadata.name as string | undefined),
+              avatarUrl: session.user.user_metadata.avatar_url as string | undefined,
+              provider: session.user.app_metadata.provider as string | undefined,
+              cloudSyncEnabled: true,
+              createdAt: nowIso(),
+              updatedAt: nowIso(),
+              source: 'online'
+            };
+            state.isAuthenticated = true;
+            state.authMode = 'online';
+
+            // Revalidate offline grant if exists
+            if (state.deviceSessionId && state.grantHash) {
+              const result = await revalidateGrantOnline(state.deviceSessionId, state.grantHash);
+              if (result === false) {
+                state.deviceSessionId = undefined;
+                state.grantHash = undefined;
+              }
+            }
+
+            // Sync from cloud
+            const cloudSnapshot = await pullFromCloud(session.user.id);
+            state.exams = cloudSnapshot.exams;
+            state.topics = cloudSnapshot.topics;
+            state.studyTasks = cloudSnapshot.studyTasks;
+            state.materials = cloudSnapshot.materials;
+            state.stats = withBadges(cloudSnapshot.exams, cloudSnapshot.studyTasks, cloudSnapshot.stats ?? seedSnapshot.stats);
+            state.authReady = true;
+            return;
           }
-          // Never trust cached auth — always re-validate with Supabase on startup.
-          state.user = null;
-          state.isAuthenticated = false;
-          state.authReady = false;
-          state.hasHydrated = true;
+        } catch {
+          // Network error - try offline
         }
-        state?.syncBadges();
-        void Promise.all([getCachedSnapshot(), getLastSyncedAt()]).then(async ([snapshot, lastSyncedAt]) => {
-          if (snapshot) {
-            useAppStore.setState((current) => ({
-              ...snapshot,
-              authReady: current.authReady,
-              hasHydrated: current.hasHydrated,
-              rewardToast: current.rewardToast,
-              isOnline: current.isOnline,
-              syncStatus: current.syncStatus,
-              syncError: current.syncError,
-              pendingWriteCount: current.pendingWriteCount,
-              lastSyncedAt: lastSyncedAt ?? snapshot.lastSyncedAt
-            }));
-          } else if (lastSyncedAt) {
-            useAppStore.setState({ lastSyncedAt });
+
+        // Fallback to offline read-only
+        const offlineAuth = await getOfflineAuth();
+        if (offlineAuth) {
+          state.user = offlineAuth.user;
+          state.authMode = offlineAuth.authMode;
+          state.isAuthenticated = true;
+          state.grantHash = offlineAuth.grantHash;
+          state.deviceSessionId = offlineAuth.deviceSessionId;
+
+          // Load and decrypt cached snapshot
+          const stored = await getOfflineGrant();
+          if (stored?.grant) {
+            const payload = await verifyOfflineGrant(stored.grant);
+            if (payload) {
+              const snapshot = await getOfflineSnapshot(stored.grant);
+              if (snapshot) {
+                const s = snapshot as OfflineSnapshot;
+                // FIXED: Only restore whitelisted data, not auth state
+                state.exams = s.exams;
+                state.topics = s.topics;
+                state.studyTasks = s.studyTasks;
+                state.materials = s.materials;
+                state.stats = s.stats;
+                state.settings = s.settings;
+              }
+            }
           }
-          const userId = useAppStore.getState().user?.id;
-          useAppStore.setState({ pendingWriteCount: userId ? (await getPendingWrites(userId)).length : 0 });
-        });
+          state.authReady = true;
+          return;
+        }
+
+        // Signed out
+        state.user = null;
+        state.isAuthenticated = false;
+        state.authMode = 'signed-out';
+        state.grantHash = undefined;
+        state.deviceSessionId = undefined;
+        state.authReady = true;
       }
     }
   )

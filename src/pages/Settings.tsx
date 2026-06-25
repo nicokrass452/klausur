@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { SegmentedControl } from "../components/SegmentedControl";
 import { ROUTES } from "../lib/constants";
+import { OFFLINE_READONLY_ENABLED } from "../lib/offlineFeatureFlag";
 import { requestNotificationPermission } from "../services/notificationService";
 import { useAppStore } from "../store/useAppStore";
 
@@ -20,6 +22,9 @@ export function SettingsPage() {
   const syncNow = useAppStore((state) => state.syncNow);
   const logout = useAppStore((state) => state.logout);
   const resetTutorial = useAppStore((state) => state.resetTutorial);
+  const enableOfflineReadOnlyAccess = useAppStore((state) => state.enableOfflineReadOnlyAccess);
+  const isOfflineReadOnly = useAppStore((state) => state.authMode === "offline-readonly");
+  const [offlineSetupStatus, setOfflineSetupStatus] = useState<string | undefined>();
 
   return (
     <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
@@ -28,7 +33,9 @@ export function SettingsPage() {
         <div className="mt-5">
           <SegmentedControl
             value={settings.theme}
-            onChange={setTheme}
+            onChange={(value) => {
+              if (!isOfflineReadOnly) setTheme(value);
+            }}
             options={[
               { value: "light", label: "Hell" },
               { value: "dark", label: "Dunkel" },
@@ -43,9 +50,11 @@ export function SettingsPage() {
         </p>
         <button
           onClick={() => {
+            if (isOfflineReadOnly) return;
             resetTutorial();
             navigate(ROUTES.dashboard);
           }}
+          disabled={isOfflineReadOnly}
           className="mt-4 rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
         >
           Einführung erneut starten
@@ -55,18 +64,20 @@ export function SettingsPage() {
         <div className="mt-5 space-y-4">
           <label className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/80 px-4 py-3 dark:border-slate-800">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Tägliche Lernreminder</span>
-            <input type="checkbox" checked={settings.reminders.dailyReminder} onChange={(event) => updateReminderSettings({ dailyReminder: event.target.checked })} />
+            <input disabled={isOfflineReadOnly} type="checkbox" checked={settings.reminders.dailyReminder} onChange={(event) => updateReminderSettings({ dailyReminder: event.target.checked })} />
           </label>
           <label className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/80 px-4 py-3 dark:border-slate-800">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Heute-lernen Hinweis</span>
-            <input type="checkbox" checked={settings.reminders.todayLearningReminder} onChange={(event) => updateReminderSettings({ todayLearningReminder: event.target.checked })} />
+            <input disabled={isOfflineReadOnly} type="checkbox" checked={settings.reminders.todayLearningReminder} onChange={(event) => updateReminderSettings({ todayLearningReminder: event.target.checked })} />
           </label>
           <button
             onClick={async () => {
+              if (isOfflineReadOnly) return;
               const permission = await requestNotificationPermission();
               updateReminderSettings({ notificationsEnabled: permission === "granted" });
             }}
-            className="rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white dark:bg-teal-500 dark:text-slate-950"
+            disabled={isOfflineReadOnly}
+            className="rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50 dark:bg-teal-500 dark:text-slate-950"
           >
             Push Notifications aktivieren
           </button>
@@ -77,7 +88,7 @@ export function SettingsPage() {
         <h3 className="font-display text-2xl text-slate-950 dark:text-white">Daten & Sync</h3>
         <label className="mt-5 block text-sm font-medium text-slate-700 dark:text-slate-200">
           Standard-Lernzeit
-          <input className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950" type="number" min="15" step="5" value={settings.defaultDailyMinutes} onChange={(event) => setDefaultDailyMinutes(Number(event.target.value))} />
+          <input disabled={isOfflineReadOnly} className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950" type="number" min="15" step="5" value={settings.defaultDailyMinutes} onChange={(event) => setDefaultDailyMinutes(Number(event.target.value))} />
         </label>
 
         <div className="mt-6 space-y-4 rounded-3xl border border-slate-200/80 p-4 dark:border-slate-800">
@@ -86,11 +97,32 @@ export function SettingsPage() {
               <p className="text-sm font-semibold text-slate-900 dark:text-white">Supabase Cloud Sync</p>
               <p className="text-sm text-slate-500">{user?.email ?? "Nicht angemeldet"}</p>
             </div>
-            <input type="checkbox" checked={settings.cloudSyncEnabled} onChange={(event) => void enableCloudSync(event.target.checked)} />
+            <input disabled={isOfflineReadOnly} type="checkbox" checked={settings.cloudSyncEnabled} onChange={(event) => void enableCloudSync(event.target.checked)} />
           </div>
+          {OFFLINE_READONLY_ENABLED && user?.source === "online" ? (
+            <div className="rounded-2xl border border-slate-200/80 p-3 dark:border-slate-800">
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">Offline Read-Only Access</p>
+              <button
+                onClick={async () => {
+                  setOfflineSetupStatus(undefined);
+                  try {
+                    await enableOfflineReadOnlyAccess();
+                    setOfflineSetupStatus("Offline-Zugriff wurde fuer diesen Browser eingerichtet.");
+                  } catch (error) {
+                    setOfflineSetupStatus(error instanceof Error ? error.message : "Offline-Zugriff konnte nicht eingerichtet werden.");
+                  }
+                }}
+                disabled={isOfflineReadOnly || !isOnline}
+                className="mt-3 rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200"
+              >
+                Offline-Zugriff einrichten
+              </button>
+              {offlineSetupStatus ? <p className="mt-2 text-sm text-slate-500">{offlineSetupStatus}</p> : null}
+            </div>
+          ) : null}
           <button
             onClick={() => void syncNow()}
-            disabled={!isOnline}
+            disabled={!isOnline || isOfflineReadOnly}
             className="rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50 dark:bg-teal-500 dark:text-slate-950"
           >
             Jetzt synchronisieren
@@ -109,6 +141,7 @@ export function SettingsPage() {
             </button>
             <button
               onClick={async () => {
+                if (isOfflineReadOnly) return;
                 const { resetPasswordForEmail } = await import("../services/syncService");
                 if (user?.email) {
                   try {
@@ -119,7 +152,8 @@ export function SettingsPage() {
                   }
                 }
               }}
-              className="rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
+              disabled={isOfflineReadOnly}
+              className="rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200"
             >
               Passwort zurücksetzen
             </button>
@@ -135,7 +169,8 @@ export function SettingsPage() {
                   }
                 }
               }}
-              className="rounded-full bg-rose-100 px-4 py-3 text-sm font-semibold text-rose-600 dark:bg-rose-900/40 dark:text-rose-400"
+              disabled={isOfflineReadOnly}
+              className="rounded-full bg-rose-100 px-4 py-3 text-sm font-semibold text-rose-600 disabled:opacity-50 dark:bg-rose-900/40 dark:text-rose-400"
             >
               Account löschen
             </button>

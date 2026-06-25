@@ -482,6 +482,9 @@ export async function syncUserStats(stats: UserStats, focusSessions: FocusSessio
 
 export async function pushToCloud(snapshot: AppSnapshot): Promise<void> {
   if (!snapshot.user) throw new Error("Kein eingeloggter Nutzer für Cloud Sync.");
+  if (snapshot.user.source !== "online") {
+    throw new Error("Offline Read-Only Nutzer koennen keine Cloud-Sync Schreibvorgaenge ausfuehren.");
+  }
   const client = requireSupabase();
   const userId = snapshot.user.id;
 

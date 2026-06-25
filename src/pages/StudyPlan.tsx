@@ -16,6 +16,7 @@ export function StudyPlanPage() {
   const allTopics = useAppStore((state) => state.topics);
   const setTaskStatus = useAppStore((state) => state.setTaskStatus);
   const redistributeMissed = useAppStore((state) => state.redistributeMissed);
+  const isOfflineReadOnly = useAppStore((state) => state.authMode === "offline-readonly");
   const [aiSummary, setAiSummary] = useState("Mock-Interfaces für KI-Optimierung, Quiz und Flashcards.");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | undefined>();
@@ -33,7 +34,7 @@ export function StudyPlanPage() {
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Lernplan Generator</p>
             <h3 className="mt-2 font-display text-2xl text-slate-950 dark:text-white">Automatische Verteilung mit Spaced Repetition</h3>
           </div>
-          <button onClick={redistributeMissed} className="rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">
+          <button disabled={isOfflineReadOnly} onClick={redistributeMissed} className="rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200">
             Verpasste neu verteilen
           </button>
         </div>
@@ -103,6 +104,7 @@ export function StudyPlanPage() {
             exam={exams.find((exam) => exam.id === task.examId)}
             onComplete={() => setTaskStatus(task.id, task.status === "done" ? "open" : "done")}
             onMissed={() => setTaskStatus(task.id, "missed")}
+            disabled={isOfflineReadOnly}
           />
         ))}
       </section>

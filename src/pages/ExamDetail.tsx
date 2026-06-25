@@ -32,6 +32,7 @@ export function ExamDetailPage() {
   const removeExam = useAppStore((state) => state.removeExam);
   const regenerateStudyPlan = useAppStore((state) => state.regenerateStudyPlan);
   const updateExam = useAppStore((state) => state.updateExam);
+  const isOfflineReadOnly = useAppStore((state) => state.authMode === "offline-readonly");
   const [topicName, setTopicName] = useState("");
   const [topicDifficulty, setTopicDifficulty] = useState(3);
   const [estimatedMinutes, setEstimatedMinutes] = useState(30);
@@ -102,10 +103,21 @@ export function ExamDetailPage() {
             <p className="mt-2 text-sm text-slate-500">{formatDateTime(exam.date, exam.time)} · Raum {exam.room || "-"}</p>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => regenerateStudyPlan(exam.id)} className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">
+            <button disabled={isOfflineReadOnly} onClick={() => regenerateStudyPlan(exam.id)} className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200">
               Lernplan neu erzeugen
             </button>
-            <Link to={ROUTES.exams} onClick={() => removeExam(exam.id)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">
+            <Link
+              to={ROUTES.exams}
+              onClick={(event) => {
+                if (isOfflineReadOnly) {
+                  event.preventDefault();
+                  return;
+                }
+                removeExam(exam.id);
+              }}
+              aria-disabled={isOfflineReadOnly}
+              className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white aria-disabled:opacity-50"
+            >
               Löschen
             </Link>
           </div>
@@ -203,6 +215,7 @@ export function ExamDetailPage() {
             className="mt-5 grid gap-4 md:grid-cols-2"
             onSubmit={(event) => {
               event.preventDefault();
+              if (isOfflineReadOnly) return;
               updateExam(exam.id, { subject, date, time, room, notes, difficulty, knowledgeLevel });
               regenerateStudyPlan(exam.id);
             }}
@@ -214,7 +227,7 @@ export function ExamDetailPage() {
             <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950" type="number" min="1" max="5" value={difficulty} onChange={(event) => setDifficulty(Number(event.target.value))} />
             <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950" type="number" min="1" max="5" value={knowledgeLevel} onChange={(event) => setKnowledgeLevel(Number(event.target.value))} />
             <textarea className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950 md:col-span-2" value={notes} onChange={(event) => setNotes(event.target.value)} />
-            <button className="rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white dark:bg-teal-500 dark:text-slate-950 md:col-span-2" type="submit">
+            <button disabled={isOfflineReadOnly} className="rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50 dark:bg-teal-500 dark:text-slate-950 md:col-span-2" type="submit">
               Klausur aktualisieren
             </button>
           </form>
@@ -224,6 +237,7 @@ export function ExamDetailPage() {
             className="mt-5 space-y-4"
             onSubmit={(event) => {
               event.preventDefault();
+              if (isOfflineReadOnly) return;
               addTopic({ examId: exam.id, name: topicName, difficulty: topicDifficulty, estimatedMinutes });
               setTopicName("");
               setTopicDifficulty(3);
@@ -235,12 +249,12 @@ export function ExamDetailPage() {
               <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950" type="number" min="1" max="5" value={topicDifficulty} onChange={(event) => setTopicDifficulty(Number(event.target.value))} />
               <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950" type="number" min="10" step="5" value={estimatedMinutes} onChange={(event) => setEstimatedMinutes(Number(event.target.value))} />
             </div>
-            <button className="rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white dark:bg-teal-500 dark:text-slate-950" type="submit">
+            <button disabled={isOfflineReadOnly} className="rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50 dark:bg-teal-500 dark:text-slate-950" type="submit">
               Thema hinzufügen
             </button>
           </form>
           <div className="mt-6">
-            <TopicChecklist topics={topics} onToggle={toggleTopic} />
+            <TopicChecklist topics={topics} onToggle={toggleTopic} disabled={isOfflineReadOnly} />
           </div>
         </section>
 
@@ -251,6 +265,7 @@ export function ExamDetailPage() {
               className="space-y-3 rounded-3xl border border-dashed border-slate-300 p-4 dark:border-slate-700"
               onSubmit={(event) => {
                 event.preventDefault();
+                if (isOfflineReadOnly) return;
                 if (!noteDraft.trim()) return;
                 addMaterial({ examId: exam.id, type: "note", title: "Notiz", content: noteDraft });
                 setNoteDraft("");
@@ -258,13 +273,14 @@ export function ExamDetailPage() {
             >
               <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Notiz speichern</p>
               <textarea className="min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950" value={noteDraft} onChange={(event) => setNoteDraft(event.target.value)} />
-              <button className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-500 dark:text-slate-950" type="submit">Notiz ablegen</button>
+              <button disabled={isOfflineReadOnly} className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 dark:bg-teal-500 dark:text-slate-950" type="submit">Notiz ablegen</button>
             </form>
 
             <form
               className="space-y-3 rounded-3xl border border-dashed border-slate-300 p-4 dark:border-slate-700"
               onSubmit={(event) => {
                 event.preventDefault();
+                if (isOfflineReadOnly) return;
                 if (!videoTitle.trim() || !videoUrl.trim()) return;
                 addMaterial({ examId: exam.id, type: "video", title: videoTitle, url: videoUrl });
                 setVideoTitle("");
@@ -274,7 +290,7 @@ export function ExamDetailPage() {
               <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Video-Link speichern</p>
               <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950" placeholder="Titel" value={videoTitle} onChange={(event) => setVideoTitle(event.target.value)} />
               <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950" placeholder="https://youtube.com/..." value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} />
-              <button className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-500 dark:text-slate-950" type="submit">Link speichern</button>
+              <button disabled={isOfflineReadOnly} className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 dark:bg-teal-500 dark:text-slate-950" type="submit">Link speichern</button>
             </form>
 
             <label className="space-y-3 rounded-3xl border border-dashed border-slate-300 p-4 dark:border-slate-700 md:col-span-2">
@@ -282,8 +298,10 @@ export function ExamDetailPage() {
               <input
                 type="file"
                 accept="application/pdf"
+                disabled={isOfflineReadOnly}
                 className="block w-full text-sm text-slate-500 file:mr-4 file:rounded-full file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:font-semibold file:text-white dark:file:bg-teal-500 dark:file:text-slate-950"
                 onChange={async (event) => {
+                  if (isOfflineReadOnly) return;
                   const file = event.target.files?.[0];
                   if (!file) return;
                   const id = addMaterial({ examId: exam.id, type: "pdf", title: file.name, fileName: file.name });
