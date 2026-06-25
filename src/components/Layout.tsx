@@ -80,6 +80,7 @@ export function Layout() {
                         setInstallPrompt(null);
                       }}
                       className="hidden items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-semibold text-white lg:inline-flex dark:bg-teal-500 dark:text-slate-950"
+                      aria-label="App installieren"
                     >
                       <Download size={15} />
                       Installieren
@@ -114,6 +115,9 @@ export function Layout() {
         <button
           onClick={clearRewardToast}
           className="fixed right-4 top-20 z-50 rounded-2xl bg-slate-950 px-4 py-3 text-left text-white shadow-panel dark:bg-teal-500 dark:text-slate-950"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
         >
           <p className="text-xs font-semibold uppercase tracking-[0.2em]">XP Update</p>
           <p className="mt-1 text-sm font-medium">

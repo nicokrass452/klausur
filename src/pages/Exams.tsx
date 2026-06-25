@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
+import { CalendarArrowDown } from "lucide-react";
 import { ExamCard } from "../components/ExamCard";
 import { useAppStore } from "../store/useAppStore";
+import { downloadIcalFile, examsToIcal } from "../utils/icalExport";
 
 export function ExamsPage() {
   const addExam = useAppStore((state) => state.addExam);
@@ -79,6 +81,19 @@ export function ExamsPage() {
       </section>
 
       <section className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="font-display text-2xl text-slate-950 dark:text-white">Deine Klausuren</h3>
+          {exams.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => downloadIcalFile(examsToIcal(exams), "klausurplaner-klausuren.ics")}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
+            >
+              <CalendarArrowDown size={16} />
+              Als Kalender exportieren (.ics)
+            </button>
+          ) : null}
+        </div>
         {exams.map((exam) => (
           <ExamCard key={exam.id} exam={exam} topics={topics} />
         ))}

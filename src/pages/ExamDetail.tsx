@@ -1,12 +1,13 @@
 import { Link, useParams } from "react-router-dom";
 import { useMemo, useState } from "react";
-import { Brain, Layers3, Loader2, Upload, WandSparkles } from "lucide-react";
+import { Brain, CalendarArrowDown, Layers3, Loader2, Upload, WandSparkles } from "lucide-react";
 import { ROUTES } from "../lib/constants";
-import { generateFlashcardsFromTopicsResult, generateQuizFromTopicsResult, getCoachMessageResult, type AiResult } from "../services/aiService";
-import { saveMaterialBlob } from "../services/storageService";
+import { generateFlashcardsFromTopicsResult, generateQuizFromTopicsResult, getCoachMessageResult, hasSupabaseEnv, type AiResult } from "../services/aiService";
+import { uploadMaterialWithOfflineFallback } from "../services/materialStorageService";
 import { useAppStore } from "../store/useAppStore";
 import type { CoachMessage, Flashcard, QuizQuestion } from "../types";
 import { formatDateTime } from "../utils/dateUtils";
+import { downloadIcalFile, examsToIcal } from "../utils/icalExport";
 import { getExamProgress } from "../utils/examUtils";
 import { ProgressBar } from "../components/ProgressBar";
 import { TopicChecklist } from "../components/TopicChecklist";
@@ -29,9 +30,13 @@ export function ExamDetailPage() {
   const addTopic = useAppStore((state) => state.addTopic);
   const toggleTopic = useAppStore((state) => state.toggleTopic);
   const addMaterial = useAppStore((state) => state.addMaterial);
+  const updateMaterial = useAppStore((state) => state.updateMaterial);
   const removeExam = useAppStore((state) => state.removeExam);
   const regenerateStudyPlan = useAppStore((state) => state.regenerateStudyPlan);
   const updateExam = useAppStore((state) => state.updateExam);
+  const user = useAppStore((state) => state.user);
+  const isOnline = useAppStore((state) => state.isOnline);
+  const cloudSyncEnabled = useAppStore((state) => state.settings.cloudSyncEnabled);
   const isOfflineReadOnly = useAppStore((state) => state.authMode === "offline-readonly");
   const [topicName, setTopicName] = useState("");
   const [topicDifficulty, setTopicDifficulty] = useState(3);
@@ -48,6 +53,7 @@ export function ExamDetailPage() {
   const [knowledgeLevel, setKnowledgeLevel] = useState(exam?.knowledgeLevel ?? 3);
   const [aiLoading, setAiLoading] = useState<AiPanel | null>(null);
   const [aiError, setAiError] = useState<string | undefined>();
+  const [aiRateLimited, setAiRateLimited] = useState(false);
   const [aiSource, setAiSource] = useState<AiResult<unknown>["source"] | undefined>();
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
@@ -77,16 +83,19 @@ export function ExamDetailPage() {
         setQuizQuestions(result.data);
         setAiSource(result.source);
         setAiError(result.error);
+        setAiRateLimited(result.rateLimited ?? false);
       } else if (panel === "flashcards") {
         const result = await generateFlashcardsFromTopicsResult(topics);
         setFlashcards(result.data);
         setAiSource(result.source);
         setAiError(result.error);
+        setAiRateLimited(result.rateLimited ?? false);
       } else {
         const result = await getCoachMessageResult(stats, examTasks);
         setCoachMessage(result.data);
         setAiSource(result.source);
         setAiError(result.error);
+        setAiRateLimited(result.rateLimited ?? false);
       }
     } finally {
       setAiLoading(null);
@@ -102,7 +111,14 @@ export function ExamDetailPage() {
             <h3 className="mt-2 font-display text-3xl text-slate-950 dark:text-white">{exam.subject}</h3>
             <p className="mt-2 text-sm text-slate-500">{formatDateTime(exam.date, exam.time)} · Raum {exam.room || "-"}</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => downloadIcalFile(examsToIcal([exam]), "klausurplaner-klausur.ics")}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
+            >
+              <CalendarArrowDown size={16} />
+              Als Kalender exportieren (.ics)
+            </button>
             <button disabled={isOfflineReadOnly} onClick={() => regenerateStudyPlan(exam.id)} className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200">
               Lernplan neu erzeugen
             </button>
@@ -164,10 +180,13 @@ export function ExamDetailPage() {
           </div>
         </div>
 
-        {aiSource ? (
-          <p className="mt-4 text-sm text-slate-500">
-            Quelle: {aiSourceLabel(aiSource)}
-            {aiError ? ` - ${aiError}` : ""}
+        <p className="mt-4 text-sm text-slate-500">
+          {aiSource ? `Quelle: ${aiSourceLabel(aiSource)}` : hasSupabaseEnv ? "KI über Supabase Edge Function" : "Mock-Fallback (kein Supabase-Setup)"}
+          {aiError ? ` — ${aiError}` : ""}
+        </p>
+        {aiRateLimited ? (
+          <p className="mt-2 text-sm font-semibold text-rose-600 dark:text-rose-300" role="status" aria-live="polite">
+            KI-Kontingent erschöpft — bitte kurz warten.
           </p>
         ) : null}
 
@@ -294,7 +313,7 @@ export function ExamDetailPage() {
             </form>
 
             <label className="space-y-3 rounded-3xl border border-dashed border-slate-300 p-4 dark:border-slate-700 md:col-span-2">
-              <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">PDF Upload vorbereiten</span>
+              <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">PDF Upload</span>
               <input
                 type="file"
                 accept="application/pdf"
@@ -304,14 +323,28 @@ export function ExamDetailPage() {
                   if (isOfflineReadOnly) return;
                   const file = event.target.files?.[0];
                   if (!file) return;
-                  const id = addMaterial({ examId: exam.id, type: "pdf", title: file.name, fileName: file.name });
-                  await saveMaterialBlob(id, file);
+                  const materialId = addMaterial({ examId: exam.id, type: "pdf", title: file.name, fileName: file.name });
+                  try {
+                    const result = await uploadMaterialWithOfflineFallback(
+                      file,
+                      exam.id,
+                      materialId,
+                      user?.id ?? "anonymous",
+                      isOnline && cloudSyncEnabled
+                    );
+                    updateMaterial(materialId, { url: result.publicUrl ?? result.path, fileName: result.fileName });
+                  } catch {
+                    // IndexedDB fallback already handled inside uploadMaterialWithOfflineFallback.
+                  }
                   event.target.value = "";
                 }}
               />
-              <div className="flex items-center gap-2 text-sm text-slate-500">
-                <Upload size={16} />
-                Dateien werden für späteren Viewer in IndexedDB gespeichert.
+              <div className="space-y-1 text-sm text-slate-500">
+                <div className="flex items-center gap-2">
+                  <Upload size={16} />
+                  {isOnline && cloudSyncEnabled ? "PDF wird nach Supabase Storage hochgeladen (max. 10 MB)." : "Offline: PDF wird lokal in IndexedDB zwischengespeichert."}
+                </div>
+                <p className="text-xs">Nur PDF-Dateien bis 10 MB werden unterstützt.</p>
               </div>
             </label>
           </div>
@@ -320,7 +353,19 @@ export function ExamDetailPage() {
             {materials.map((material) => (
               <div key={material.id} className="rounded-2xl border border-slate-200/80 px-4 py-3 dark:border-slate-800">
                 <p className="font-medium text-slate-900 dark:text-white">{material.title}</p>
-                <p className="text-sm text-slate-500">{material.type === "note" ? material.content : material.url ?? material.fileName}</p>
+                {material.type === "note" ? (
+                  <p className="text-sm text-slate-500">{material.content}</p>
+                ) : material.type === "video" ? (
+                  <a href={material.url} target="_blank" rel="noreferrer" className="text-sm text-teal-600 hover:underline dark:text-teal-400">
+                    {material.url}
+                  </a>
+                ) : material.url ? (
+                  <a href={material.url} target="_blank" rel="noreferrer" className="text-sm text-teal-600 hover:underline dark:text-teal-400">
+                    {material.fileName ?? "PDF öffnen"}
+                  </a>
+                ) : (
+                  <p className="text-sm text-slate-500">{material.fileName}</p>
+                )}
               </div>
             ))}
           </div>

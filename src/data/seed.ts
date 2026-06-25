@@ -99,6 +99,7 @@ export const seedSnapshot: AppSnapshot = {
     defaultDailyMinutes: 40,
     cloudSyncEnabled: false,
     tutorialCompleted: false,
+    language: "de",
     reminders: {
       dailyReminder: true,
       todayLearningReminder: true,

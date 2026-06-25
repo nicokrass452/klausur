@@ -23,6 +23,8 @@ export function LoginPage({ mode = "login" }: LoginPageProps) {
   const [submitting, setSubmitting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authInfo, setAuthInfo] = useState<string | null>(null);
+  const [showResend, setShowResend] = useState(false);
+  const [resending, setResending] = useState(false);
   const redirectTo = (location.state as { from?: string } | null)?.from ?? ROUTES.dashboard;
   const isSignup = mode === "signup";
   const configIssue = getSupabaseConfigIssue();
@@ -84,7 +86,30 @@ export function LoginPage({ mode = "login" }: LoginPageProps) {
 
           {authError ? (
             <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">
-              {authError}
+              <p>{authError}</p>
+              {showResend ? (
+                <button
+                  type="button"
+                  disabled={resending}
+                  onClick={async () => {
+                    setResending(true);
+                    try {
+                      const { resendConfirmationEmail } = await import("../services/syncService");
+                      await resendConfirmationEmail(email);
+                      setAuthInfo("Bestätigungs-E-Mail wurde erneut gesendet.");
+                      setAuthError(null);
+                      setShowResend(false);
+                    } catch (error) {
+                      setAuthError(error instanceof Error ? error.message : "Erneutes Senden fehlgeschlagen.");
+                    } finally {
+                      setResending(false);
+                    }
+                  }}
+                  className="mt-2 text-sm font-semibold text-rose-700 underline disabled:opacity-50 dark:text-rose-300"
+                >
+                  {resending ? "Wird gesendet..." : "Keine Mail da? Erneut senden"}
+                </button>
+              ) : null}
             </div>
           ) : null}
 
@@ -136,7 +161,9 @@ export function LoginPage({ mode = "login" }: LoginPageProps) {
                   await login("email", email, password);
                 }
               } catch (error) {
-                setAuthError(error instanceof Error ? error.message : isSignup ? "Registrierung fehlgeschlagen." : "Anmeldung fehlgeschlagen.");
+                const message = error instanceof Error ? error.message : isSignup ? "Registrierung fehlgeschlagen." : "Anmeldung fehlgeschlagen.";
+                setAuthError(message);
+                setShowResend(message.toLowerCase().includes("e-mail") && message.toLowerCase().includes("bestätige"));
               } finally {
                 setSubmitting(false);
               }

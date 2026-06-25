@@ -58,6 +58,9 @@ VITE_SENTRY_DSN=optional-sentry-dsn
 # Offline Read-Only Cache Access (Feature Flag, default: off)
 VITE_ENABLE_OFFLINE_READONLY=false
 VITE_OFFLINE_PUBLIC_KEY=
+
+# Web Push VAPID public key (base64url). Required for background push notifications.
+VITE_VAPID_PUBLIC_KEY=
 ```
 
 Server-only Werte gehoeren in Supabase Edge Function Secrets oder `.env.server`, nie in den Browser und nie mit `VITE_`:
@@ -67,6 +70,9 @@ OFFLINE_READONLY_ENABLED=false
 OFFLINE_SIGNING_KEY=
 CLEANUP_CRON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
+# VAPID key pair for Web Push (server-only).
+VAPID_PRIVATE_KEY=
+VAPID_PUBLIC_KEY=
 ```
 
 **Production Guardrail:** Offline Read-Only Access ist vorbereitet, bleibt aber bis zur Staging-/Release-Readiness-Pruefung deaktiviert. In Production vorerst nicht setzen:
@@ -113,7 +119,7 @@ OFFLINE_READONLY_ENABLED=true
 - Themen mit Fortschritt in Prozent
 - Automatischer Lernplan (Prioritätsformel, 70/20/10, Spaced Repetition: Tag 1, 2, 5, 10, 18)
 - Manuelle Neuverteilung verpasster Aufgaben
-- Lernmaterialien (Notizen, Links) pro Klausur — UI vorhanden, Upload noch begrenzt
+- Lernmaterialien (Notizen, Links, PDFs) pro Klausur — Upload in Supabase Storage mit offline Fallback
 
 ### Produktivität & Motivation
 - Dashboard: nächste Klausur, Countdown, XP, Level, Streak, Fokuszeit
@@ -126,7 +132,7 @@ OFFLINE_READONLY_ENABLED=true
 - KI-Coach mit Modi: Coach, Quiz, Karteikarten, Plan, Erklären
 - GLM + DeepSeek über Supabase Edge Function `ai-coach` (Mock-Fallback lokal)
 - Supabase Cloud-Sync (Push/Pull mit Konfliktauflösung nach `updatedAt`)
-- Browser-Benachrichtigungen (nur bei geöffneter App und erteilter Permission)
+- Browser-Benachrichtigungen + Web Push (Hintergrund) bei erteilter Permission
 
 ### UI
 - Mobile-first, Bottom-Navigation + Sidebar
@@ -165,6 +171,36 @@ DEEPSEEK_MODEL=deepseek-v4-flash
 ```
 
 **Wichtig:** `GLM_API_KEY` und `DEEPSEEK_API_KEY` nie in `.env`, `.env.example` oder als `VITE_*` eintragen.
+
+## Datei-Upload (Supabase Storage)
+
+Lernmaterialien (PDFs) werden in einen privaten `materials` Bucket hochgeladen. RLS erlaubt nur dem eigenen User Zugriff auf Dateien unter `<user_id>/<exam_id>/<material_id>/`.
+
+Migration:
+
+```sql
+-- supabase/migrations/20250101000004_materials_storage.sql
+```
+
+Edge Function Secrets:
+
+```powershell
+supabase secrets set SUPABASE_SERVICE_ROLE_KEY="<service-role-key>"
+```
+
+## Web Push (Hintergrund-Benachrichtigungen)
+
+1. VAPID-Schlüsselpaar erzeugen (z. B. mit `web-push` CLI oder OpenSSL).
+2. `VITE_VAPID_PUBLIC_KEY` in `.env` und `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` als Edge Function Secrets setzen.
+3. Migration `20250101000005_push_subscriptions.sql` ausführen.
+4. Edge Functions deployen:
+
+```powershell
+supabase functions deploy subscribe-push
+supabase functions deploy send-push
+```
+
+Frontend: Der Aktivierungsbutton in Settings ruft `subscribeUserToPush()` auf. Der Service Worker zeigt Benachrichtigungen im `push`-Event und öffnet die App bei Klick.
 
 ## Offline Read-Only Cache Access (Feature Flag)
 
@@ -225,6 +261,40 @@ Release-readiness checklist for staging:
 - Encrypted cache decrypts with the correct grant.
 - Encrypted cache fails with the wrong grant.
 - Offline mutation attempts fail at the data layer.
+
+## RLS-Verifizierung
+
+Vor jedem Release sollte `supabase/migrations/20250101000006_verify_rls.sql` im SQL Editor ausgeführt werden. Die Assertionen prüfen, dass RLS auf allen App-Tabellen aktiviert ist und mindestens eine Policy existiert.
+
+```sql
+-- Führt die enthaltenen DO-Block-Assertionen aus
+```
+
+Dieser Schritt ist manuell durchzuführen, da er eine live Datenbank benötigt.
+
+## Key-Rotation
+
+### Publishable/Anon Key
+
+1. Neues Schlüsselpaar in Supabase **Project Settings → API** erzeugen.
+2. Neuen `VITE_SUPABASE_ANON_KEY` in der Deployment-Umgebung setzen.
+3. `npm run build` neu ausführen (die Variable wird statisch eingebettet).
+4. Alten Key in Supabase widerrufen, nachdem das Deployment stabil läuft.
+
+### Edge Function Secrets
+
+```powershell
+supabase secrets set GLM_API_KEY="<neuer-key>"
+supabase secrets set DEEPSEEK_API_KEY="<neuer-key>"
+supabase secrets set OFFLINE_SIGNING_KEY="<neuer-key>"
+supabase secrets set VAPID_PRIVATE_KEY="<neuer-key>"
+supabase secrets set VAPID_PUBLIC_KEY="<neuer-key>"
+supabase functions deploy ai-coach get-device-challenge register-device revalidate-grant cleanup-expired-challenges subscribe-push send-push
+```
+
+### VAPID Key Pair
+
+Bei Rotation müssen alle Push-Subscriptions neu abgeschlossen werden (User müssen Push erneut aktivieren), da der alte Public Key an den Endpoints hängt.
 
 ## Projektstruktur
 
@@ -308,55 +378,71 @@ Diese Liste beschreibt, was für ein **produktionsreifes Produkt jenseits des MV
 ### Auth & Account
 - [x] **Passwort zurücksetzen** — „Passwort zurücksetzen“-Flow im Settings-Menü implementiert.
 - [x] **Account löschen** — RPC Call zum Löschen des Accounts und aller Cloud-Daten vorhanden.
-- [ ] **E-Mail-Bestätigung** — Verhalten hängt von Supabase-Einstellungen ab; UX für unbestätigte Accounts noch minimal.
+- [x] **E-Mail-Bestätigung** — Login erkennt unbestätigte E-Mail-Adressen und bietet "Erneut senden" an; `resendConfirmationEmail` in syncService.
 - [ ] **Session-Handling auf mehreren Geräten** — kein explizites Geräte-Management oder „überall abmelden“ außer globalem Sign-out.
 
 ### Sync & Daten
 - [ ] **Sync-Strategie grob** — vollständiger Push/Pull-Snapshot statt inkrementeller Änderungen oder Realtime-Subscriptions.
 - [x] **Konfliktauflösung simpel** — Tests für Last-Write-Wins (updatedAt) hinzugefügt.
 - [x] **Kein Offline-Queue** — Änderungen offline werden nun vermerkt (`pendingOfflineChanges`) und bei Wiederherstellung der Verbindung asynchron gesynct.
-- [ ] **Materialien / Dateien** — Schema und UI für PDFs/Notizen vorhanden, aber kein Upload in Supabase Storage, keine Vorschau, keine Größenlimits.
+- [x] **Materialien / Dateien** — PDF-Upload in privaten Supabase Storage Bucket (max. 10 MB) mit RLS; offline Fallback zu IndexedDB; Vorschau/Download-Link in ExamDetail.
 - [ ] **Seed-Daten für Gäste** — Kalender-Vorschau nutzt Demo-Daten; keine echte anonyme Cloud-Vorschau.
 
 ### Lernlogik & Features
-- [ ] **Verpasste Aufgaben** — Neuverteilung nur manuell über Button, nicht automatisch beim App-Start oder per Cron.
+- [x] **Verpasste Aufgaben** — Automatische Neuverteilung verpasster offener Aufgaben beim App-Start (sofern online und nicht im Offline-Lesemodus).
 - [ ] **Lernplan nicht adaptiv** — keine echte Schwachstellenanalyse oder dynamische Priorisierung aus Nutzungsdaten.
-- [ ] **Analytics basic** — keine Exporte, keine Langzeit-Trends, keine Vergleiche zwischen Fächern.
-- [ ] **Kein iCal/Google-Calendar-Export** — Klausurtermine nicht in externe Kalender integrierbar.
+- [x] **Analytics basic** — CSV-Export der Lernzeiten/XP sowie 7/14/30-Tage-XP-Trends in Analytics verfügbar.
+- [x] **Kein iCal/Google-Calendar-Export** — ICS-Export für einzelne Klausuren und alle aktiven Klausuren in `Exams` und `ExamDetail` verfügbar.
 - [ ] **Keine Lerngruppen** — kein Teilen von Plänen, keine gemeinsamen Klausuren.
 
 ### KI
-- [ ] **Edge Function Pflicht für echte KI** — ohne Deploy nur Mock-Antworten; kein Hinweis in der UI, welcher Provider aktiv ist (außer implizit).
-- [ ] **Kein Rate-Limit-Feedback** — Nutzer sehen nicht, wenn KI-Kontingente erschöpft sind.
+- [x] **Edge Function Pflicht für echte KI** — Proaktiver Hinweis auf aktiven KI-Modus (Edge Function vs. Mock-Fallback) in Coach, ExamDetail und StudyPlan.
+- [x] **Kein Rate-Limit-Feedback** — HTTP-429 wird in `aiService` erkannt und als prominentes Rate-Limit-Feedback in Coach, ExamDetail und StudyPlan angezeigt.
 - [ ] **Kein Kontext aus Materialien** — Coach kennt hochgeladene PDFs/Notizen noch nicht.
 
 ### PWA & Benachrichtigungen
 - [x] **Service Worker minimal** — Caching Strategie für App-Shell in public/service-worker.js via Stale-While-Revalidate optimiert.
-- [ ] **Kein Web Push im Hintergrund** — Todo-Marker in Service Worker vorbereitet, Implementierung ausstehend.
+- [x] **Kein Web Push im Hintergrund** — `push_subscriptions` Tabelle, `subscribe-push` + `send-push` Edge Functions (VAPID-Signatur), Service-Worker Push/Click Handler und Aktivierungs-Button in Settings.
 - [x] **Kein Install-Prompt-Flow** — `beforeinstallprompt`-Event in `App.tsx` hinzugefügt, geführter Flow muss noch im UI angezeigt werden.
 
 ### UI & UX
-- [ ] **Tutorial nicht überspringbar** — erzwungenes Onboarding beim ersten Login; kein „Später“ für erfahrene Nutzer.
-- [ ] **Fehler-Feedback bei Sync** — Status-Badge zeigt „Sync Fehler“, Details nur in Settings; kein Retry-UI in der Hauptnavigation.
-- [ ] **Barrierefreiheit** — keine systematische ARIA-/Tastatur-/Screenreader-Prüfung.
-- [ ] **Internationalisierung** — nur Deutsch; keine i18n-Infrastruktur.
+- [x] **Tutorial nicht überspringbar** — Onboarding-Tutorial kann mit „Später“ übersprungen werden; Neustart über Einstellungen möglich.
+- [x] **Fehler-Feedback bei Sync** — Sync-Status-Badge ist bei Fehlern klickbar und löst `syncNow()` aus; Tooltip zeigt die Fehlermeldung.
+- [x] **Barrierefreiheit** — Fokussierte Durchgänge: aria-labels für Icon-Buttons, aria-live Regionen für Sync-Fehler/Coach-Laden/XP-Toast, Escape schließt das Tutorial. Vollständige Audit bleibt offen.
+- [x] **Internationalisierung** — Leichtgewichtige i18n-Infrastruktur (`src/lib/i18n.ts`, `src/locales/de.ts`, `src/locales/en.ts`) mit Sprachumschaltung in Settings; nur hochsichtbare Strings extrahiert, Rest fallback zu Key.
 
 ### Sicherheit & Betrieb
-- [ ] **RLS Policies** — im Schema definiert, aber nicht automatisch in jedem Projekt verifiziert.
-- [ ] **API-Key-Rotation** — keine Dokumentation für Wechsel von Publishable/Legacy-Keys in laufenden Deployments.
+- [x] **RLS Policies** — `20250101000006_verify_rls.sql` prüft RLS + Policies vor Release im SQL Editor.
+- [x] **API-Key-Rotation** — Abschnitt "Key-Rotation" dokumentiert Rotation von Publishable/Anon Keys, Edge-Function-Secrets und VAPID-Keys.
 - [x] **Observability** — optionale Integration von @sentry/react in `main.tsx` verfügbar, konfigurierbar über `VITE_SENTRY_DSN`.
 
 ## Roadmap (kurz)
 
-Priorität für die nächsten Ausbaustufen:
+In diesem Durchlauf abgeschlossen:
 
-1. Automatisierte Supabase-Migrationen + CI mit Env-Secrets
-2. Test-Suite (Sync, Auth, Lernplan-Generator)
-3. Inkrementeller Sync + Offline-Queue
-4. Web Push + Hintergrund-Erinnerungen
-5. Datei-Upload (Supabase Storage) + KI-Kontext aus Materialien
-6. Passwort-Reset, Account-Löschung, besseres Multi-Device-Verhalten
-7. Adaptive Lernplanung und Kalender-Export
+- Überspringbares Tutorial, Sync-Retry in der Hauptnavigation, automatische Neuverteilung verpasster Aufgaben
+- iCal/Google-Calendar Export, Analytics CSV + XP-Trends
+- KI Provider-Hinweis + Rate-Limit-Feedback
+- PDF-Upload in Supabase Storage
+- Web Push MVP (Subscribe/Send Edge Functions, VAPID, Service Worker)
+- E-Mail-Bestätigungs-UX, Barrierefreiheits-Pass, i18n-Foundation
+- RLS-Verifizierung + Key-Rotation-Doku
+
+Explizit zurückgestellt (noch offen):
+
+- Lerngruppen / geteilte Pläne (Schema, Invites, RLS, UI — mehrere Tage)
+- Vollständige i18n (nur Foundation; restliche Strings extrahieren)
+- Echter KI-Kontext aus hochgeladenen Materialien
+- Realtime inkrementeller Sync (architektureller Umbau)
+- Multi-Device Session Management
+
+Nächste Prioritäten:
+
+1. KI-Kontext aus Materialien (Storage → ai-coach)
+2. Lerngruppen / geteilte Pläne
+3. Vollständige i18n (EN) und Accessibility-Audit
+4. Realtime / inkrementeller Sync
+5. Adaptive Lernplanung
 
 ## Lizenz
 

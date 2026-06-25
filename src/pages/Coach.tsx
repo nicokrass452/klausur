@@ -1,6 +1,6 @@
 import { Brain, CheckCircle2, ClipboardList, Eye, GraduationCap, Layers3, Loader2, Send, Sparkles } from "lucide-react";
 import { FormEvent, useMemo, useRef, useState } from "react";
-import { sendCoachChatResult, type CoachChatMessage, type CoachChatMode } from "../services/aiService";
+import { hasSupabaseEnv, sendCoachChatResult, type CoachChatMessage, type CoachChatMode } from "../services/aiService";
 import { useAppStore } from "../store/useAppStore";
 
 const modes: Array<{ id: CoachChatMode; label: string; icon: typeof Sparkles }> = [
@@ -116,6 +116,7 @@ export function CoachPage() {
   ]);
   const [source, setSource] = useState<"glm" | "deepseek" | "mock" | undefined>();
   const [error, setError] = useState<string | undefined>();
+  const [rateLimited, setRateLimited] = useState(false);
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -176,6 +177,7 @@ export function CoachPage() {
       const result = await sendCoachChatResult(mode, nextMessages, context);
       setSource(result.source);
       setError(result.error);
+      setRateLimited(result.rateLimited ?? false);
       setMessages([...nextMessages, { role: "assistant", content: result.data.message }]);
     } finally {
       setLoading(false);
@@ -223,7 +225,9 @@ export function CoachPage() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/70 px-5 py-4 dark:border-slate-800">
           <div>
             <p className="text-sm font-semibold text-slate-950 dark:text-white">{modes.find((entry) => entry.id === mode)?.label}</p>
-            <p className="text-sm text-slate-500">{source ? `Quelle: ${sourceLabel(source)}` : "Bereit"}</p>
+            <p className="text-sm text-slate-500">
+              {source ? `Quelle: ${sourceLabel(source)}` : hasSupabaseEnv ? "KI über Supabase Edge Function" : "Mock-Fallback (kein Supabase-Setup)"}
+            </p>
           </div>
           <button
             onClick={() => {
@@ -259,14 +263,19 @@ export function CoachPage() {
             );
           })}
           {loading ? (
-            <div className="flex justify-start">
+            <div className="flex justify-start" role="status" aria-live="polite">
               <div className="inline-flex items-center gap-2 rounded-3xl bg-slate-100 px-4 py-3 text-sm text-slate-500 dark:bg-slate-950">
-                <Loader2 className="animate-spin" size={16} />
+                <Loader2 className="animate-spin" size={16} aria-hidden="true" />
                 Denke nach...
               </div>
             </div>
           ) : null}
-          {error ? <p className="text-sm text-amber-600 dark:text-amber-300">Fallback aktiv: {error}</p> : null}
+          {rateLimited ? (
+            <p className="text-sm font-semibold text-rose-600 dark:text-rose-300" role="status" aria-live="polite">
+              KI-Kontingent erschöpft — bitte kurz warten.
+            </p>
+          ) : null}
+          {error ? <p className="text-sm text-amber-600 dark:text-amber-300">{error}</p> : null}
         </div>
 
         <form onSubmit={(event) => void submitMessage(event)} className="border-t border-slate-200/70 p-4 dark:border-slate-800">

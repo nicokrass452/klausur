@@ -1,7 +1,7 @@
 import { WandSparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import { TaskCard } from "../components/TaskCard";
-import { generateFlashcardsFromTopicsResult, generateQuizFromTopicsResult, optimizeStudyPlanWithAiResult } from "../services/aiService";
+import { generateFlashcardsFromTopicsResult, generateQuizFromTopicsResult, hasSupabaseEnv, optimizeStudyPlanWithAiResult } from "../services/aiService";
 import { useAppStore } from "../store/useAppStore";
 
 function aiSourceName(source: "glm" | "deepseek" | "mock"): string {
@@ -17,9 +17,10 @@ export function StudyPlanPage() {
   const setTaskStatus = useAppStore((state) => state.setTaskStatus);
   const redistributeMissed = useAppStore((state) => state.redistributeMissed);
   const isOfflineReadOnly = useAppStore((state) => state.authMode === "offline-readonly");
-  const [aiSummary, setAiSummary] = useState("Mock-Interfaces für KI-Optimierung, Quiz und Flashcards.");
+  const [aiSummary, setAiSummary] = useState(hasSupabaseEnv ? "KI über Supabase Edge Function bereit." : "Mock-Fallback (kein Supabase-Setup).");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | undefined>();
+  const [aiRateLimited, setAiRateLimited] = useState(false);
 
   const exams = useMemo(() => allExams.filter((entry) => !entry.deletedAt), [allExams]);
   const studyTasks = useMemo(() => allStudyTasks.filter((entry) => !entry.deletedAt), [allStudyTasks]);
@@ -46,6 +47,7 @@ export function StudyPlanPage() {
               try {
                 const result = await optimizeStudyPlanWithAiResult(sortedTasks);
                 setAiError(result.error);
+                setAiRateLimited(result.rateLimited ?? false);
                 setAiSummary(`${aiSourceName(result.source)} priorisiert ${result.data.slice(0, 3).map((task) => task.task).join(", ")}.`);
               } finally {
                 setAiLoading(false);
@@ -64,6 +66,7 @@ export function StudyPlanPage() {
               try {
                 const result = await generateQuizFromTopicsResult(topics);
                 setAiError(result.error);
+                setAiRateLimited(result.rateLimited ?? false);
                 setAiSummary(`${aiSourceName(result.source)} hat ${result.data.length} Fragen aus deinen Themen erzeugt.`);
               } finally {
                 setAiLoading(false);
@@ -81,6 +84,7 @@ export function StudyPlanPage() {
               try {
                 const result = await generateFlashcardsFromTopicsResult(topics);
                 setAiError(result.error);
+                setAiRateLimited(result.rateLimited ?? false);
                 setAiSummary(`${aiSourceName(result.source)} hat ${result.data.length} Karten vorbereitet.`);
               } finally {
                 setAiLoading(false);
@@ -93,7 +97,12 @@ export function StudyPlanPage() {
           </button>
         </div>
         <p className="mt-4 text-sm text-slate-500">{aiSummary}</p>
-        {aiError ? <p className="mt-2 text-sm text-amber-600 dark:text-amber-300">Fallback aktiv: {aiError}</p> : null}
+        {aiRateLimited ? (
+          <p className="mt-2 text-sm font-semibold text-rose-600 dark:text-rose-300" role="status" aria-live="polite">
+            KI-Kontingent erschöpft — bitte kurz warten.
+          </p>
+        ) : null}
+        {aiError ? <p className="mt-2 text-sm text-amber-600 dark:text-amber-300">{aiError}</p> : null}
       </section>
 
       <section className="space-y-4">

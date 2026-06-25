@@ -122,6 +122,7 @@ export interface AppSettings {
   reminders: ReminderSettings;
   cloudSyncEnabled: boolean;
   tutorialCompleted: boolean;
+  language: "de" | "en";
 }
 
 export interface QuizQuestion {

@@ -1,8 +1,10 @@
 import { useMemo } from "react";
+import { Download } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import { formatMinutes } from "../utils/dateUtils";
 import { getLearningMinutesForExam, getWeakestExam } from "../utils/examUtils";
 import { xpToNextLevel } from "../utils/gamification";
+import { buildAnalyticsCsv, downloadCsvFile, xpTrendSummary } from "../utils/analyticsExport";
 import { ProgressBar } from "../components/ProgressBar";
 
 export function AnalyticsPage() {
@@ -14,6 +16,10 @@ export function AnalyticsPage() {
   const topics = useMemo(() => allTopics.filter((entry) => !entry.deletedAt), [allTopics]);
   const studyTasks = useMemo(() => allStudyTasks.filter((entry) => !entry.deletedAt), [allStudyTasks]);
   const weakestExam = getWeakestExam(exams, topics);
+
+  const trend7 = useMemo(() => xpTrendSummary(stats, 7), [stats]);
+  const trend14 = useMemo(() => xpTrendSummary(stats, 14), [stats]);
+  const trend30 = useMemo(() => xpTrendSummary(stats, 30), [stats]);
 
   return (
     <div className="space-y-6">
@@ -38,7 +44,17 @@ export function AnalyticsPage() {
 
       <section className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
         <article className="rounded-[32px] border border-white/50 bg-white/80 p-6 shadow-panel dark:border-slate-800 dark:bg-slate-900/80">
-          <h3 className="font-display text-2xl text-slate-950 dark:text-white">Lernzeit pro Fach</h3>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="font-display text-2xl text-slate-950 dark:text-white">Lernzeit pro Fach</h3>
+            <button
+              type="button"
+              onClick={() => downloadCsvFile(buildAnalyticsCsv(stats, exams, studyTasks), "klausurplaner-analytics.csv")}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
+            >
+              <Download size={16} />
+              Als CSV exportieren
+            </button>
+          </div>
           <div className="mt-5 space-y-5">
             {exams.map((exam) => {
               const minutes = getLearningMinutesForExam(exam.id, studyTasks);
@@ -57,6 +73,11 @@ export function AnalyticsPage() {
 
         <article className="rounded-[32px] border border-white/50 bg-white/80 p-6 shadow-panel dark:border-slate-800 dark:bg-slate-900/80">
           <h3 className="font-display text-2xl text-slate-950 dark:text-white">XP-Verlauf</h3>
+          <div className="mt-4 flex flex-wrap gap-3 text-sm text-slate-600 dark:text-slate-300">
+            <span className="rounded-2xl border border-slate-200/80 px-3 py-1.5 dark:border-slate-800">7 Tage: <strong>{trend7.totalXp} XP</strong></span>
+            <span className="rounded-2xl border border-slate-200/80 px-3 py-1.5 dark:border-slate-800">14 Tage: <strong>{trend14.totalXp} XP</strong></span>
+            <span className="rounded-2xl border border-slate-200/80 px-3 py-1.5 dark:border-slate-800">30 Tage: <strong>{trend30.totalXp} XP</strong></span>
+          </div>
           <div className="mt-6 space-y-4">
             {stats.xpHistory.map((entry) => (
               <div key={entry.date}>

@@ -1,5 +1,7 @@
 import type { CoachMessage, Flashcard, QuizQuestion, StudyTask, Topic, UserStats } from "../types";
-import { getSupabaseRequestHeaders, supabase, supabaseAnonKey, supabaseUrl } from "../lib/supabase";
+import { getSupabaseRequestHeaders, hasSupabaseEnv, supabase, supabaseAnonKey, supabaseUrl } from "../lib/supabase";
+
+export { hasSupabaseEnv };
 
 type AiAction = "generateQuiz" | "generateFlashcards" | "optimizeStudyPlan" | "coachMessage" | "coachChat";
 type AiSource = "glm" | "deepseek" | "mock";
@@ -14,6 +16,7 @@ export interface AiResult<T> {
   data: T;
   source: AiSource;
   error?: string;
+  rateLimited?: boolean;
 }
 
 export interface CoachChatResponse {
@@ -103,6 +106,13 @@ function isCoachMessage(value: unknown): value is CoachMessage {
   return typeof item?.title === "string" && typeof item.body === "string";
 }
 
+export function isRateLimitedError(error: unknown): boolean {
+  const context = (error as { context?: unknown })?.context;
+  if (context instanceof Response && context.status === 429) return true;
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return message.includes("zu viele ki-anfragen") || message.includes("rate limit") || message.includes("429");
+}
+
 async function errorMessage(error: unknown): Promise<string> {
   const context = (error as { context?: unknown })?.context;
   if (context instanceof Response) {
@@ -166,7 +176,13 @@ async function invokeAiCoach<T>(
 
     return { data: pick(parsed?.data), source: parsed?.fallback ? "mock" : parsed?.source ?? "glm" };
   } catch (error) {
-    return { data: await fallback(), source: "mock", error: await errorMessage(error) };
+    const rateLimited = isRateLimitedError(error);
+    return {
+      data: await fallback(),
+      source: "mock",
+      error: rateLimited ? "KI-Kontingent erschöpft — bitte kurz warten." : await errorMessage(error),
+      rateLimited
+    };
   }
 }
 

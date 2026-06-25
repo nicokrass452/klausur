@@ -3,7 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { SegmentedControl } from "../components/SegmentedControl";
 import { ROUTES } from "../lib/constants";
 import { OFFLINE_READONLY_ENABLED } from "../lib/offlineFeatureFlag";
+import { t } from "../lib/i18n";
 import { requestNotificationPermission } from "../services/notificationService";
+import { isPushSupported, subscribeUserToPush, unsubscribeFromPush, VAPID_PUBLIC_KEY } from "../services/pushService";
 import { useAppStore } from "../store/useAppStore";
 
 export function SettingsPage() {
@@ -18,6 +20,7 @@ export function SettingsPage() {
   const updateReminderSettings = useAppStore((state) => state.updateReminderSettings);
   const setTheme = useAppStore((state) => state.setTheme);
   const setDefaultDailyMinutes = useAppStore((state) => state.setDefaultDailyMinutes);
+  const setLanguage = useAppStore((state) => state.setLanguage);
   const enableCloudSync = useAppStore((state) => state.enableCloudSync);
   const syncNow = useAppStore((state) => state.syncNow);
   const logout = useAppStore((state) => state.logout);
@@ -29,7 +32,7 @@ export function SettingsPage() {
   return (
     <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
       <section className="rounded-[32px] border border-white/50 bg-white/80 p-6 shadow-panel dark:border-slate-800 dark:bg-slate-900/80">
-        <h3 className="font-display text-2xl text-slate-950 dark:text-white">Darstellung</h3>
+        <h3 className="font-display text-2xl text-slate-950 dark:text-white">{t("settings.theme")}</h3>
         <div className="mt-5">
           <SegmentedControl
             value={settings.theme}
@@ -40,6 +43,20 @@ export function SettingsPage() {
               { value: "light", label: "Hell" },
               { value: "dark", label: "Dunkel" },
               { value: "system", label: "System" }
+            ]}
+          />
+        </div>
+
+        <h3 className="mt-8 font-display text-2xl text-slate-950 dark:text-white">{t("settings.language")}</h3>
+        <div className="mt-5">
+          <SegmentedControl
+            value={settings.language}
+            onChange={(value) => {
+              if (!isOfflineReadOnly) setLanguage(value as "de" | "en");
+            }}
+            options={[
+              { value: "de", label: t("settings.language.de") },
+              { value: "en", label: t("settings.language.en") }
             ]}
           />
         </div>
@@ -60,14 +77,14 @@ export function SettingsPage() {
           Einführung erneut starten
         </button>
 
-        <h3 className="mt-8 font-display text-2xl text-slate-950 dark:text-white">Erinnerungen</h3>
+        <h3 className="mt-8 font-display text-2xl text-slate-950 dark:text-white">{t("settings.reminders")}</h3>
         <div className="mt-5 space-y-4">
           <label className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/80 px-4 py-3 dark:border-slate-800">
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Tägliche Lernreminder</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t("settings.dailyReminder")}</span>
             <input disabled={isOfflineReadOnly} type="checkbox" checked={settings.reminders.dailyReminder} onChange={(event) => updateReminderSettings({ dailyReminder: event.target.checked })} />
           </label>
           <label className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/80 px-4 py-3 dark:border-slate-800">
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Heute-lernen Hinweis</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t("settings.todayReminder")}</span>
             <input disabled={isOfflineReadOnly} type="checkbox" checked={settings.reminders.todayLearningReminder} onChange={(event) => updateReminderSettings({ todayLearningReminder: event.target.checked })} />
           </label>
           <button
@@ -79,8 +96,38 @@ export function SettingsPage() {
             disabled={isOfflineReadOnly}
             className="rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50 dark:bg-teal-500 dark:text-slate-950"
           >
-            Push Notifications aktivieren
+            {t("settings.notifications")}
           </button>
+          {VAPID_PUBLIC_KEY && isPushSupported() ? (
+            <button
+              onClick={async () => {
+                if (isOfflineReadOnly) return;
+                try {
+                  await subscribeUserToPush();
+                  updateReminderSettings({ notificationsEnabled: true });
+                } catch (error) {
+                  alert(error instanceof Error ? error.message : "Push-Abonnement fehlgeschlagen.");
+                }
+              }}
+              disabled={isOfflineReadOnly}
+              className="rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200"
+            >
+              {t("settings.enablePush")}
+            </button>
+          ) : null}
+          {VAPID_PUBLIC_KEY && isPushSupported() ? (
+            <button
+              onClick={async () => {
+                if (isOfflineReadOnly) return;
+                await unsubscribeFromPush();
+                updateReminderSettings({ notificationsEnabled: false });
+              }}
+              disabled={isOfflineReadOnly}
+              className="rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200"
+            >
+              {t("settings.disablePush")}
+            </button>
+          ) : null}
         </div>
       </section>
 
@@ -131,7 +178,11 @@ export function SettingsPage() {
           <p className="text-sm text-slate-500">Vorgemerkte Offline-Aenderungen: {pendingWriteCount}</p>
           {!isOnline ? <p className="text-sm text-amber-600 dark:text-amber-300">Offline: Aenderungen werden lokal vorgemerkt und spaeter synchronisiert.</p> : null}
           <p className="text-sm text-slate-500">Letzter Sync: {lastSyncedAt ? new Date(lastSyncedAt).toLocaleString("de-DE") : "-"}</p>
-          {syncError ? <p className="text-sm text-rose-600 dark:text-rose-300">{syncError}</p> : null}
+          {syncError ? (
+            <p className="text-sm text-rose-600 dark:text-rose-300" role="status" aria-live="assertive">
+              {syncError}
+            </p>
+          ) : null}
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => void logout()}

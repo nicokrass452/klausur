@@ -85,6 +85,7 @@ interface AppStore extends AppSnapshot {
   updateTopic: (id: string, patch: Partial<Topic>) => void;
   toggleTopic: (id: string) => void;
   addMaterial: (payload: Omit<StudyMaterial, "id" | "createdAt" | "updatedAt" | "deletedAt" | "userId">) => string;
+  updateMaterial: (id: string, patch: Partial<StudyMaterial>) => void;
   setTaskStatus: (id: string, status: StudyTask["status"]) => void;
   regenerateStudyPlan: (examId?: string) => void;
   redistributeMissed: () => void;
@@ -93,6 +94,7 @@ interface AppStore extends AppSnapshot {
   setCalendarMode: (mode: AppSettings["calendarMode"]) => void;
   updateReminderSettings: (patch: Partial<AppSettings["reminders"]>) => void;
   setDefaultDailyMinutes: (minutes: number) => void;
+  setLanguage: (language: AppSettings["language"]) => void;
   clearRewardToast: () => void;
   syncBadges: () => void;
   setOnlineStatus: (online: boolean) => void;
@@ -412,6 +414,20 @@ export const useAppStore = create<AppStore>()(
         return materialId;
       },
 
+      updateMaterial: (id, patch) => {
+        requireMutation(get());
+        let updated: StudyMaterial | undefined;
+        set((state) => {
+          const materials = state.materials.map((material) => {
+            if (material.id !== id) return material;
+            updated = touch({ ...material, ...patch });
+            return updated;
+          });
+          return { materials, syncStatus: state.isOnline ? "idle" : "queued" };
+        });
+        if (updated) enqueueWrite({ table: "study_materials" as const, op: "upsert" as const, payload: updated });
+      },
+
       setTaskStatus: (id, status) => {
         requireMutation(get());
         let updated: StudyTask | undefined;
@@ -517,6 +533,16 @@ export const useAppStore = create<AppStore>()(
       setDefaultDailyMinutes: (minutes) => {
         requireMutation(get());
         set((state) => ({ settings: { ...state.settings, defaultDailyMinutes: minutes } }));
+      },
+
+      setLanguage: (language) => {
+        requireMutation(get());
+        set((state) => {
+          if (typeof window !== "undefined") {
+            localStorage.setItem("klausurplaner:language", language);
+          }
+          return { settings: { ...state.settings, language } };
+        });
       },
 
       clearRewardToast: () => {

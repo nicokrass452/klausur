@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { BrowserRouter } from "react-router-dom";
 import { useHydratedStore } from "./hooks/useHydratedStore";
 import { useNotifications } from "./hooks/useNotifications";
@@ -7,6 +7,8 @@ import { hasSupabaseEnv } from "./lib/supabase";
 import { AppRouter } from "./routes/AppRouter";
 import { onAuthStateChange, resolveAuthUser } from "./services/syncService";
 import { useAppStore } from "./store/useAppStore";
+import { t } from "./lib/i18n";
+import { toIsoDate } from "./utils/dateUtils";
 
 export default function App() {
   useTheme();
@@ -17,8 +19,12 @@ export default function App() {
   const setAuthSession = useAppStore((state) => state.setAuthSession);
   const setOnlineStatus = useAppStore((state) => state.setOnlineStatus);
   const isAuthenticated = useAppStore((state) => state.isAuthenticated);
+  const authMode = useAppStore((state) => state.authMode);
   const cloudSyncEnabled = useAppStore((state) => state.settings.cloudSyncEnabled);
   const syncNow = useAppStore((state) => state.syncNow);
+  const redistributeMissed = useAppStore((state) => state.redistributeMissed);
+  const studyTasks = useAppStore((state) => state.studyTasks);
+  const hasAutoRedistributed = useRef(false);
 
   useEffect(() => {
     if (!hasSupabaseEnv) {
@@ -81,8 +87,25 @@ export default function App() {
     return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
   }, []);
 
+  useEffect(() => {
+    if (!hydrated || !authReady || hasAutoRedistributed.current) return;
+    if (!isAuthenticated || authMode === "offline-readonly") return;
+
+    const today = toIsoDate(new Date());
+    const hasMissedOpenTasks = studyTasks.some(
+      (task) => !task.deletedAt && task.status === "open" && task.date < today
+    );
+
+    if (hasMissedOpenTasks) {
+      redistributeMissed();
+    }
+    hasAutoRedistributed.current = true;
+  }, [hydrated, authReady, isAuthenticated, authMode, studyTasks, redistributeMissed]);
+
+  const language = useAppStore((state) => state.settings.language);
+
   if (!hydrated || !authReady) {
-    return <div className="grid min-h-screen place-items-center bg-slate-950 text-white">Klausurplaner lädt...</div>;
+    return <div className="grid min-h-screen place-items-center bg-slate-950 text-white">{t("app.loading", language)}</div>;
   }
 
   return (
