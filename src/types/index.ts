@@ -58,6 +58,20 @@ export interface StudyMaterial extends SyncableEntity {
   createdAt: string;
 }
 
+export type MaterialChunkSource = "pdf" | "note";
+
+/** A retrievable text chunk extracted from a user's study material (PDF or note). */
+export interface MaterialChunk extends SyncableEntity {
+  id: string;
+  materialId: string;
+  examId: string;
+  chunkIndex: number;
+  source: MaterialChunkSource;
+  content: string;
+  tokenCount: number;
+  createdAt: string;
+}
+
 export interface FocusSession extends SyncableEntity {
   id: string;
   startedAt: string;

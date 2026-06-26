@@ -49,7 +49,20 @@ export const de = {
   "sync.syncing": "Sync läuft",
   "sync.queued": "wartet",
   "sync.error": "Sync Fehler",
-  "sync.ready": "Sync bereit"
+  "sync.ready": "Sync bereit",
+
+  // PWA install prompt
+  "install.title": "App installieren",
+  "install.description": "Lege Klausurplaner auf deinen Startbildschirm für schnellen Zugriff und Offline-Nutzung.",
+  "install.button": "Installieren",
+  "install.dismiss": "Später",
+  "install.installing": "Installiere…",
+  "install.iosTitle": "Zum Home-Bildschirm hinzufügen",
+  "install.iosDescription": "iOS Safari unterstützt keine automatische Installation. Lege die App manuell ab:",
+  "install.iosStep1": "Tippe unten auf das Teilen-Symbol.",
+  "install.iosStep2": "Wähle „Zum Home-Bildschirm“.",
+  "install.iosStep3": "Tippe auf „Hinzufügen“.",
+  "install.installed": "Klausurplaner ist installiert."
 } as const;
 
 export type TranslationKey = keyof typeof de;

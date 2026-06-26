@@ -11,6 +11,8 @@ Diese Liste beschreibt, was für ein **produktionsreifes Produkt jenseits des MV
 - Web Push MVP (Subscribe/Send Edge Functions, VAPID, Service Worker)
 - E-Mail-Bestätigungs-UX, Barrierefreiheits-Pass, i18n-Foundation
 - RLS-Verifizierung + Key-Rotation-Doku
+- PWA Install-Prompt-Flow (beforeinstallprompt, iOS-Anleitung, CTA in Dashboard/Settings)
+- KI-Kontext aus Materialien (material_chunks + PDF-Extraktion + ai-coach-Anreicherung)
 
 ## Bekannte Probleme & Offene Punkte
 
@@ -58,7 +60,7 @@ Diese Liste beschreibt, was für ein **produktionsreifes Produkt jenseits des MV
 |--------|-------|-------------|
 | ✅ | Edge Function Pflicht | Proaktiver Hinweis auf aktiven KI-Modus (Edge Function vs. Mock-Fallback) in Coach, ExamDetail und StudyPlan. |
 | ✅ | Rate-Limit-Feedback | HTTP-429 wird in `aiService` erkannt und als prominentes Rate-Limit-Feedback in Coach, ExamDetail und StudyPlan angezeigt. |
-| ⬜ | KI-Kontext aus Materialien | Coach kennt hochgeladene PDFs/Notizen noch nicht. |
+| ✅ | KI-Kontext aus Materialien | `material_chunks`-Tabelle mit RLS; clientseitige PDF-Extraktion (pdfjs-dist) + Chunking; Edge Function `ai-coach` lädt nutzereigene Chunks via PostgREST (RLS erzwungen), rankt nach Keyword-Overlap und begrenzt auf Token-Budget; „Materialien verwenden"-Toggle in Coach/ExamDetail/StudyPlan; UI-Badge zeigt Chunks/Nutzung an. |
 
 ### PWA & Benachrichtigungen
 
@@ -66,7 +68,7 @@ Diese Liste beschreibt, was für ein **produktionsreifes Produkt jenseits des MV
 |--------|-------|-------------|
 | ✅ | Service Worker | Caching-Strategie für App-Shell in public/service-worker.js via Stale-While-Revalidate optimiert. |
 | ✅ | Web Push | `push_subscriptions` Tabelle, `subscribe-push` + `send-push` Edge Functions (VAPID-Signatur), Service-Worker Push/Click Handler und Aktivierungs-Button in Settings. |
-| ⬜ | Install-Prompt-Flow | `beforeinstallprompt`-Event in `App.tsx` hinzugefügt, geführter Flow muss noch im UI angezeigt werden. |
+| ✅ | Install-Prompt-Flow | `beforeinstallprompt` wird in `useInstallPrompt` gespeichert; `InstallPromptCard`-CTA in Dashboard & Settings; iOS-Safari-Anleitung; CTA verschwindet nach Installation/Dismissal. |
 
 ### UI & UX
 
@@ -87,16 +89,15 @@ Diese Liste beschreibt, was für ein **produktionsreifes Produkt jenseits des MV
 
 ## Nächste Prioritäten
 
-1. KI-Kontext aus Materialien (Storage → ai-coach)
-2. Lerngruppen / geteilte Pläne
-3. Vollständige i18n (EN) und Accessibility-Audit
-4. Realtime / inkrementeller Sync
-5. Adaptive Lernplanung
+1. Lerngruppen / geteilte Pläne
+2. Vollständige i18n (EN) und Accessibility-Audit
+3. Realtime / inkrementeller Sync
+4. Adaptive Lernplanung
+5. Multi-Device Session Management
 
 ## Explizit zurückgestellt
 
 - Lerngruppen / geteilte Pläne (Schema, Invites, RLS, UI — mehrere Tage)
 - Vollständige i18n (nur Foundation; restliche Strings extrahieren)
-- Echter KI-Kontext aus hochgeladenen Materialien
 - Realtime inkrementeller Sync (architektureller Umbau)
 - Multi-Device Session Management

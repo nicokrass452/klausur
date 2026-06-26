@@ -11,8 +11,10 @@ npm run preview
 
 ## CI/CD
 
-- TODO section (not implemented yet): CI/CD Pipeline (GitHub Actions) ist eingerichtet mit Test und Build.
-- Production-Builds und Secrets sind in der GitHub Actions CI dokumentiert und eingepflegt.
+- CI/CD Pipeline (GitHub Actions) ist eingerichtet mit Test und Build (`.github/workflows/ci.yml`: Typecheck, Tests, Build).
+- Production-Builds und Secrets sind in der GitHub Actions CI dokumentiert und eingepflegt (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_GOOGLE_CLIENT_ID`, `VITE_AUTH_REDIRECT_URL`, `VITE_SENTRY_DSN`).
+
+> Quelle der Wahrheit für den Feature-Status ist [`docs/roadmap.md`](./roadmap.md). Status ✅/⬜ dort gilt auch für dieses Dokument. Offene TODOs werden als tracked Issues geführt (siehe [`docs/issues.md`](./issues.md)).
 
 ## Edge Functions deployen
 

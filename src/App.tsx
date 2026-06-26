@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { BrowserRouter } from "react-router-dom";
 import { useHydratedStore } from "./hooks/useHydratedStore";
+import { useInstallPrompt } from "./hooks/useInstallPrompt";
 import { useNotifications } from "./hooks/useNotifications";
 import { useTheme } from "./hooks/useTheme";
 import { hasSupabaseEnv } from "./lib/supabase";
@@ -75,17 +76,9 @@ export default function App() {
     }
   }, [isAuthenticated, cloudSyncEnabled, syncNow]);
 
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      // Only show prompt logic could be added here later (e.g. state.setInstallPromptEvent(e))
-      // Currently, it holds the event. In a full implementation, you'd save `e` to a global state
-      // and show a custom install button.
-      (window as any).deferredPrompt = e;
-    };
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-  }, []);
+  // Capture the deferred install prompt at the root so it is available even
+  // before the user navigates to a page that renders the install CTA.
+  useInstallPrompt();
 
   useEffect(() => {
     if (!hydrated || !authReady || hasAutoRedistributed.current) return;

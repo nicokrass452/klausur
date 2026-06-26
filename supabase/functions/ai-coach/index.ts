@@ -1,9 +1,20 @@
+import {
+  buildMaterialContextSection,
+  type MaterialChunkRow
+} from "./materialContext.ts";
+
 type AiAction = "generateQuiz" | "generateFlashcards" | "optimizeStudyPlan" | "coachMessage" | "coachChat";
 type CoachMode = "coach" | "quiz" | "flashcards" | "plan" | "explain";
 
 interface AuthUser {
   id: string;
   authenticated: boolean;
+}
+
+interface MaterialContextMeta {
+  used: boolean;
+  chunkCount: number;
+  examScoped: boolean;
 }
 
 interface TopicInput {
@@ -100,7 +111,7 @@ function errorResponse(message: string, status: number, debug?: DebugInfo): Resp
   );
 }
 
-function aiFallbackResponse(action: AiAction, payload: Record<string, unknown>, message: string, debug?: DebugInfo): Response {
+function aiFallbackResponse(action: AiAction, payload: Record<string, unknown>, message: string, debug?: DebugInfo, material?: MaterialContextMeta): Response {
   logDebug("ai-coach-fallback", debug);
   return jsonResponse(
     {
@@ -112,7 +123,8 @@ function aiFallbackResponse(action: AiAction, payload: Record<string, unknown>, 
       aiHttpStatus: debug?.aiHttpStatus,
       aiErrorText: debug?.aiErrorText?.slice(0, 300),
       model: debug?.model,
-      hasAiApiKey: debug?.hasAiApiKey
+      hasAiApiKey: debug?.hasAiApiKey,
+      materialContext: material ?? { used: false, chunkCount: 0, examScoped: false }
     },
     200
   );
@@ -263,29 +275,129 @@ function assertRateLimit(user: AuthUser): void {
   rateLimitStore.set(user.id, recent);
 }
 
-function buildPrompt(action: AiAction, payload: Record<string, unknown>): string {
+/**
+ * Pulls the user's material chunks from PostgREST using their JWT, so RLS
+ * (auth.uid() = user_id) restricts the result to the current user even if the
+ * Edge Function tried to ask for someone else's rows. Optional examId scopes the
+ * retrieval to one exam's materials.
+ */
+async function fetchUserMaterialChunks(
+  req: Request,
+  user: AuthUser,
+  examId?: string
+): Promise<MaterialChunkRow[]> {
+  if (!user.authenticated) return [];
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const authHeader = req.headers.get("authorization");
+  if (!supabaseUrl || !supabaseAnonKey || !authHeader) return [];
+
+  const params = new URLSearchParams({
+    select: "id,material_id,exam_id,chunk_index,source,content,token_count",
+    "deleted_at": "is.null",
+    "order": "chunk_index.asc",
+    "limit": "100"
+  });
+  if (examId) params.set("exam_id", `eq.${examId}`);
+
+  const url = `${supabaseUrl}/rest/v1/material_chunks?${params.toString()}`;
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        apikey: supabaseAnonKey,
+        authorization: authHeader,
+        accept: "application/json"
+      }
+    });
+  } catch {
+    // Network/PostgREST failure: degrade gracefully — answer without material context.
+    return [];
+  }
+  if (!response.ok) return [];
+
+  let rows: unknown;
+  try {
+    rows = await response.json();
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(rows)) return [];
+
+  return rows
+    .filter((row): row is MaterialChunkRow => {
+      if (!row || typeof row !== "object") return false;
+      const entry = row as Record<string, unknown>;
+      return (
+        typeof entry.id === "string" &&
+        typeof entry.material_id === "string" &&
+        typeof entry.exam_id === "string" &&
+        typeof entry.chunk_index === "number" &&
+        (entry.source === "pdf" || entry.source === "note") &&
+        typeof entry.content === "string" &&
+        typeof entry.token_count === "number"
+      );
+    })
+    .slice(0, 100);
+}
+
+/**
+ * Extracts the natural-language "query" used to rank chunks for each action.
+ * For chat it's the last user message; for tasks it's the task text; for topics
+ * it's the topic names. Empty queries fall back to a no-op ranking.
+ */
+function extractRankingQuery(action: AiAction, payload: Record<string, unknown>): string {
+  if (action === "coachChat") {
+    const messages = Array.isArray(payload.messages) ? payload.messages : [];
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const entry = messages[i] as Record<string, unknown> | undefined;
+      if (entry && entry.role === "user" && typeof entry.content === "string") {
+        return entry.content;
+      }
+    }
+    return "";
+  }
+  if (action === "coachMessage" || action === "optimizeStudyPlan") {
+    const tasks = Array.isArray(payload.tasks) ? payload.tasks : [];
+    return tasks
+      .map((task) => (task as { task?: unknown })?.task)
+      .filter((task): task is string => typeof task === "string")
+      .join(" ");
+  }
+  // generateQuiz / generateFlashcards
+  const topics = Array.isArray(payload.topics) ? payload.topics : [];
+  return topics
+    .map((topic) => (topic as { name?: unknown })?.name)
+    .filter((name): name is string => typeof name === "string")
+    .join(" ");
+}
+
+function buildPrompt(action: AiAction, payload: Record<string, unknown>, materialSection: string | null): string {
+  const materialBlock = materialSection ? `${materialSection}\n\n` : "";
+
   if (action === "generateQuiz") {
     const topics = assertTopics(payload);
-    return `Erstelle 5 kurze Multiple-Choice-Fragen fuer diese Klausurthemen. Antworte nur als JSON: {"questions":[{"id":"string","prompt":"string","options":["string","string","string","string"],"answer":"string"}]}\nThemen:\n${JSON.stringify(topics)}`;
+    return `${materialBlock}Erstelle 5 kurze Multiple-Choice-Fragen fuer diese Klausurthemen. Antworte nur als JSON: {"questions":[{"id":"string","prompt":"string","options":["string","string","string","string"],"answer":"string"}]}\nThemen:\n${JSON.stringify(topics)}`;
   }
 
   if (action === "generateFlashcards") {
     const topics = assertTopics(payload);
-    return `Erstelle 6 kompakte Lernkarten. Antworte nur als JSON: {"flashcards":[{"id":"string","front":"string","back":"string"}]}\nThemen:\n${JSON.stringify(topics)}`;
+    return `${materialBlock}Erstelle 6 kompakte Lernkarten. Antworte nur als JSON: {"flashcards":[{"id":"string","front":"string","back":"string"}]}\nThemen:\n${JSON.stringify(topics)}`;
   }
 
   if (action === "optimizeStudyPlan") {
     const tasks = assertTasks(payload);
-    return `Sortiere und optimiere diesen Lernplan. Behalte alle IDs und Felder bei, veraendere nur Reihenfolge, status nicht aendern. Antworte nur als JSON: {"tasks":[...]}.\nAufgaben:\n${JSON.stringify(tasks)}`;
+    return `${materialBlock}Sortiere und optimiere diesen Lernplan. Behalte alle IDs und Felder bei, veraendere nur Reihenfolge, status nicht aendern. Antworte nur als JSON: {"tasks":[...]}.\nAufgaben:\n${JSON.stringify(tasks)}`;
   }
 
   if (action === "coachMessage") {
     const stats = assertStats(payload);
     const tasks = assertTasks(payload);
-    return `Gib eine kurze motivierende Lerncoach-Nachricht auf Deutsch. Antworte nur als JSON: {"title":"string","body":"string"}.\nStats:\n${JSON.stringify(stats)}\nAufgaben:\n${JSON.stringify(tasks.slice(0, 20))}`;
+    return `${materialBlock}Gib eine kurze motivierende Lerncoach-Nachricht auf Deutsch. Antworte nur als JSON: {"title":"string","body":"string"}.\nStats:\n${JSON.stringify(stats)}\nAufgaben:\n${JSON.stringify(tasks.slice(0, 20))}`;
   }
 
-  return buildCoachChatPrompt(payload);
+  return buildCoachChatPrompt(payload, materialSection);
 }
 
 function modeInstruction(mode: CoachMode): string {
@@ -304,21 +416,23 @@ function modeInstruction(mode: CoachMode): string {
   return "Coachmodus: Sei ein direkter Lerncoach. Gib konkrete naechste Schritte, halte Antworten kurz und motivierend, aber nicht oberflaechlich.";
 }
 
-function buildCoachChatPrompt(payload: Record<string, unknown>): string {
+function buildCoachChatPrompt(payload: Record<string, unknown>, materialSection: string | null): string {
   const mode = assertCoachMode(payload.mode);
   const messages = assertChatMessages(payload);
   const context = payload.context && typeof payload.context === "object" ? payload.context : {};
+  const materialBlock = materialSection ? `${materialSection}\n\n` : "";
   return `Du bist der KI-Trainer in einer Klausurplaner-App. Antworte auf Deutsch und nur als JSON: {"message":"string"}.
 ${modeInstruction(mode)}
 
-App-Kontext:
+${materialBlock}App-Kontext:
 ${JSON.stringify(context).slice(0, 6000)}
 
 Chatverlauf:
 ${JSON.stringify(messages)}
 
 Antwortregeln:
-- Nutze den App-Kontext, wenn er hilfreich ist.
+- Nutze den App-Kontext und die Material-Auszuege, wenn sie hilfreich sind.
+- Wenn du dich auf hochgeladene Materialien beziehst, erwaehne das kurz (z.B. "Laut deinen Notizen...").
 - Erfinde keine gespeicherten Daten.
 - Bei Begruessungen oder Smalltalk antworte kurz und natuerlich, ohne sofort einen Lernplan zu geben.
 - Stelle eine knappe Rueckfrage, wenn der Nutzer noch kein konkretes Ziel genannt hat.
@@ -588,18 +702,39 @@ Deno.serve(async (req) => {
     debug.userId = user.id;
     assertRateLimit(user);
 
-    const prompt = buildPrompt(body.action, body.payload);
+    // Material context: only fetched when the client opts in via useMaterials.
+    // RLS on material_chunks (auth.uid() = user_id) guarantees the Edge Function
+    // can only read this user's rows, even if a different examId is supplied.
+    const useMaterials = body.payload.useMaterials === true;
+    const examId = typeof body.payload.examId === "string" && body.payload.examId.length > 0
+      ? body.payload.examId.slice(0, 100)
+      : undefined;
+    let materialSection: string | null = null;
+    const materialMeta: MaterialContextMeta = { used: false, chunkCount: 0, examScoped: Boolean(examId) };
+    if (useMaterials) {
+      const chunks = await fetchUserMaterialChunks(req, user, examId);
+      if (chunks.length > 0) {
+        const rankingQuery = extractRankingQuery(body.action, body.payload);
+        materialSection = buildMaterialContextSection(chunks, rankingQuery);
+        if (materialSection) {
+          materialMeta.used = true;
+          materialMeta.chunkCount = chunks.length;
+        }
+      }
+    }
+
+    const prompt = buildPrompt(body.action, body.payload, materialSection);
     let result: { data: unknown; provider: AiProvider };
     try {
       result = await callPrimaryWithDeepSeekFallback(body.action, prompt, debug);
     } catch (error) {
       if (error instanceof PublicError && error.status >= 500) {
-        return aiFallbackResponse(body.action, body.payload, error.message, debug);
+        return aiFallbackResponse(body.action, body.payload, error.message, debug, materialMeta);
       }
       throw error;
     }
     logDebug("ai-coach-success", debug);
-    return jsonResponse({ data: result.data, source: result.provider });
+    return jsonResponse({ data: result.data, source: result.provider, materialContext: materialMeta });
   } catch (error) {
     if (error instanceof PublicError) return errorResponse(error.message, error.status, debug);
     const invalidRequest = error instanceof SyntaxError || error instanceof Error && error.message.startsWith("Invalid");

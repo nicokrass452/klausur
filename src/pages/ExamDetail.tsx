@@ -2,10 +2,12 @@ import { Link, useParams } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { Brain, CalendarArrowDown, Layers3, Loader2, Upload, WandSparkles } from "lucide-react";
 import { ROUTES } from "../lib/constants";
-import { generateFlashcardsFromTopicsResult, generateQuizFromTopicsResult, getCoachMessageResult, hasSupabaseEnv, type AiResult } from "../services/aiService";
+import { MaterialsContextToggle } from "../components/MaterialsContextToggle";
+import { generateFlashcardsFromTopicsResult, generateQuizFromTopicsResult, getCoachMessageResult, hasSupabaseEnv, type AiResult, type MaterialContextMeta } from "../services/aiService";
+import { buildChunksForMaterial } from "../services/materialChunkService";
 import { uploadMaterialWithOfflineFallback } from "../services/materialStorageService";
 import { useAppStore } from "../store/useAppStore";
-import type { CoachMessage, Flashcard, QuizQuestion } from "../types";
+import type { CoachMessage, Flashcard, QuizQuestion, StudyMaterial } from "../types";
 import { formatDateTime } from "../utils/dateUtils";
 import { downloadIcalFile, examsToIcal } from "../utils/icalExport";
 import { getExamProgress } from "../utils/examUtils";
@@ -55,6 +57,9 @@ export function ExamDetailPage() {
   const [aiError, setAiError] = useState<string | undefined>();
   const [aiRateLimited, setAiRateLimited] = useState(false);
   const [aiSource, setAiSource] = useState<AiResult<unknown>["source"] | undefined>();
+  const [useMaterials, setUseMaterials] = useState(false);
+  const [materialContext, setMaterialContext] = useState<MaterialContextMeta | undefined>();
+  const [chunkStatus, setChunkStatus] = useState<string | undefined>();
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [coachMessage, setCoachMessage] = useState<CoachMessage | null>(null);
@@ -77,28 +82,50 @@ export function ExamDetailPage() {
   async function runAiAction(panel: AiPanel): Promise<void> {
     setAiLoading(panel);
     setAiError(undefined);
+    const options = { useMaterials, examId: id };
     try {
       if (panel === "quiz") {
-        const result = await generateQuizFromTopicsResult(topics);
+        const result = await generateQuizFromTopicsResult(topics, options);
         setQuizQuestions(result.data);
         setAiSource(result.source);
         setAiError(result.error);
         setAiRateLimited(result.rateLimited ?? false);
+        setMaterialContext(result.materialContext);
       } else if (panel === "flashcards") {
-        const result = await generateFlashcardsFromTopicsResult(topics);
+        const result = await generateFlashcardsFromTopicsResult(topics, options);
         setFlashcards(result.data);
         setAiSource(result.source);
         setAiError(result.error);
         setAiRateLimited(result.rateLimited ?? false);
+        setMaterialContext(result.materialContext);
       } else {
-        const result = await getCoachMessageResult(stats, examTasks);
+        const result = await getCoachMessageResult(stats, examTasks, options);
         setCoachMessage(result.data);
         setAiSource(result.source);
         setAiError(result.error);
         setAiRateLimited(result.rateLimited ?? false);
+        setMaterialContext(result.materialContext);
       }
     } finally {
       setAiLoading(null);
+    }
+  }
+
+  async function extractChunksForMaterial(material: StudyMaterial, pdfBlob?: Blob): Promise<void> {
+    if (isOfflineReadOnly || !user?.id) return;
+    try {
+      const chunks = await buildChunksForMaterial({ material, userId: user.id, pdfBlob });
+      setChunkStatus(
+        chunks.length > 0
+          ? `${chunks.length} ${chunks.length === 1 ? "Chunk" : "Chunks"} aus „${material.title}" extrahiert.`
+          : `Kein Text aus „${material.title}" extrahierbar.`
+      );
+    } catch (error) {
+      setChunkStatus(
+        error instanceof Error
+          ? `Chunk-Extraktion fehlgeschlagen: ${error.message}`
+          : "Chunk-Extraktion fehlgeschlagen."
+      );
     }
   }
 
@@ -184,6 +211,14 @@ export function ExamDetailPage() {
           {aiSource ? `Quelle: ${aiSourceLabel(aiSource)}` : hasSupabaseEnv ? "KI über Supabase Edge Function" : "Mock-Fallback (kein Supabase-Setup)"}
           {aiError ? ` — ${aiError}` : ""}
         </p>
+        <div className="mt-3">
+          <MaterialsContextToggle
+            checked={useMaterials}
+            onChange={setUseMaterials}
+            disabled={isOfflineReadOnly}
+            materialContext={materialContext}
+          />
+        </div>
         {aiRateLimited ? (
           <p className="mt-2 text-sm font-semibold text-rose-600 dark:text-rose-300" role="status" aria-live="polite">
             KI-Kontingent erschöpft — bitte kurz warten.
@@ -279,6 +314,12 @@ export function ExamDetailPage() {
 
         <section className="rounded-[32px] border border-white/50 bg-white/80 p-6 shadow-panel dark:border-slate-800 dark:bg-slate-900/80">
           <h4 className="font-display text-2xl text-slate-950 dark:text-white">Lernmaterial</h4>
+          <p className="mt-2 text-sm text-slate-500">
+            Notizen und PDFs werden automatisch in Text-Chunks zerlegt und stehen dem KI-Coach als Kontext zur Verfügung, sobald du „Hochgeladene Materialien nutzen" aktivierst.
+          </p>
+          {chunkStatus ? (
+            <p className="mt-2 text-sm text-teal-700 dark:text-teal-300" role="status" aria-live="polite">{chunkStatus}</p>
+          ) : null}
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <form
               className="space-y-3 rounded-3xl border border-dashed border-slate-300 p-4 dark:border-slate-700"
@@ -286,7 +327,20 @@ export function ExamDetailPage() {
                 event.preventDefault();
                 if (isOfflineReadOnly) return;
                 if (!noteDraft.trim()) return;
-                addMaterial({ examId: exam.id, type: "note", title: "Notiz", content: noteDraft });
+                const materialId = addMaterial({ examId: exam.id, type: "note", title: "Notiz", content: noteDraft });
+                const now = new Date().toISOString();
+                const material: StudyMaterial = {
+                  id: materialId,
+                  userId: user?.id,
+                  examId: exam.id,
+                  type: "note",
+                  title: "Notiz",
+                  content: noteDraft,
+                  createdAt: now,
+                  updatedAt: now,
+                  deletedAt: null
+                };
+                void extractChunksForMaterial(material);
                 setNoteDraft("");
               }}
             >
@@ -324,6 +378,8 @@ export function ExamDetailPage() {
                   const file = event.target.files?.[0];
                   if (!file) return;
                   const materialId = addMaterial({ examId: exam.id, type: "pdf", title: file.name, fileName: file.name });
+                  const now = new Date().toISOString();
+                  let materialUrl: string | undefined;
                   try {
                     const result = await uploadMaterialWithOfflineFallback(
                       file,
@@ -332,10 +388,24 @@ export function ExamDetailPage() {
                       user?.id ?? "anonymous",
                       isOnline && cloudSyncEnabled
                     );
-                    updateMaterial(materialId, { url: result.publicUrl ?? result.path, fileName: result.fileName });
+                    materialUrl = result.publicUrl ?? result.path;
+                    updateMaterial(materialId, { url: materialUrl, fileName: result.fileName });
                   } catch {
                     // IndexedDB fallback already handled inside uploadMaterialWithOfflineFallback.
                   }
+                  const material: StudyMaterial = {
+                    id: materialId,
+                    userId: user?.id,
+                    examId: exam.id,
+                    type: "pdf",
+                    title: file.name,
+                    fileName: file.name,
+                    url: materialUrl,
+                    createdAt: now,
+                    updatedAt: now,
+                    deletedAt: null
+                  };
+                  void extractChunksForMaterial(material, file);
                   event.target.value = "";
                 }}
               />

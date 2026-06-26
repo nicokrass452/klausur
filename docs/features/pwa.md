@@ -38,8 +38,9 @@ supabase functions deploy send-push
 
 ## Install-Prompt
 
-- `beforeinstallprompt`-Event ist in `App.tsx` hinzugefügt.
-- TODO section (not implemented yet): Geführter Install-Flow muss noch im UI angezeigt werden.
+- `beforeinstallprompt`-Event wird in `App.tsx` abgefangen und der Prompt im `useInstallPrompt`-Hook gespeichert.
+- Geführter Install-Flow: `InstallPromptCard`-CTA in Dashboard und Settings; iOS-Safari-Anleitung für „Zum Home-Bildschirm"; CTA wird nach Installation oder Dismissal ausgeblendet.
+- Status: siehe [`docs/roadmap.md`](../roadmap.md) (PWA & Benachrichtigungen → Install-Prompt-Flow). Offene Punkte als tracked Issue in [`docs/issues.md`](../issues.md).
 
 ## VAPID Key Rotation
 

@@ -51,5 +51,18 @@ export const en: Record<TranslationKey, string> = {
   "sync.syncing": "Syncing",
   "sync.queued": "queued",
   "sync.error": "Sync error",
-  "sync.ready": "Sync ready"
+  "sync.ready": "Sync ready",
+
+  // PWA install prompt
+  "install.title": "Install app",
+  "install.description": "Add Klausurplaner to your home screen for quick access and offline use.",
+  "install.button": "Install",
+  "install.dismiss": "Later",
+  "install.installing": "Installing…",
+  "install.iosTitle": "Add to Home Screen",
+  "install.iosDescription": "iOS Safari does not support automatic install. Add the app manually:",
+  "install.iosStep1": "Tap the Share icon at the bottom.",
+  "install.iosStep2": "Select \"Add to Home Screen\".",
+  "install.iosStep3": "Tap \"Add\".",
+  "install.installed": "Klausurplaner is installed."
 };

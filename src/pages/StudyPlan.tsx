@@ -1,7 +1,8 @@
 import { WandSparkles } from "lucide-react";
 import { useMemo, useState } from "react";
+import { MaterialsContextToggle } from "../components/MaterialsContextToggle";
 import { TaskCard } from "../components/TaskCard";
-import { generateFlashcardsFromTopicsResult, generateQuizFromTopicsResult, hasSupabaseEnv, optimizeStudyPlanWithAiResult } from "../services/aiService";
+import { generateFlashcardsFromTopicsResult, generateQuizFromTopicsResult, hasSupabaseEnv, optimizeStudyPlanWithAiResult, type MaterialContextMeta } from "../services/aiService";
 import { useAppStore } from "../store/useAppStore";
 
 function aiSourceName(source: "glm" | "deepseek" | "mock"): string {
@@ -21,6 +22,8 @@ export function StudyPlanPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | undefined>();
   const [aiRateLimited, setAiRateLimited] = useState(false);
+  const [useMaterials, setUseMaterials] = useState(false);
+  const [materialContext, setMaterialContext] = useState<MaterialContextMeta | undefined>();
 
   const exams = useMemo(() => allExams.filter((entry) => !entry.deletedAt), [allExams]);
   const studyTasks = useMemo(() => allStudyTasks.filter((entry) => !entry.deletedAt), [allStudyTasks]);
@@ -45,9 +48,10 @@ export function StudyPlanPage() {
               setAiLoading(true);
               setAiError(undefined);
               try {
-                const result = await optimizeStudyPlanWithAiResult(sortedTasks);
+                const result = await optimizeStudyPlanWithAiResult(sortedTasks, { useMaterials });
                 setAiError(result.error);
                 setAiRateLimited(result.rateLimited ?? false);
+                setMaterialContext(result.materialContext);
                 setAiSummary(`${aiSourceName(result.source)} priorisiert ${result.data.slice(0, 3).map((task) => task.task).join(", ")}.`);
               } finally {
                 setAiLoading(false);
@@ -64,9 +68,10 @@ export function StudyPlanPage() {
               setAiLoading(true);
               setAiError(undefined);
               try {
-                const result = await generateQuizFromTopicsResult(topics);
+                const result = await generateQuizFromTopicsResult(topics, { useMaterials });
                 setAiError(result.error);
                 setAiRateLimited(result.rateLimited ?? false);
+                setMaterialContext(result.materialContext);
                 setAiSummary(`${aiSourceName(result.source)} hat ${result.data.length} Fragen aus deinen Themen erzeugt.`);
               } finally {
                 setAiLoading(false);
@@ -82,9 +87,10 @@ export function StudyPlanPage() {
               setAiLoading(true);
               setAiError(undefined);
               try {
-                const result = await generateFlashcardsFromTopicsResult(topics);
+                const result = await generateFlashcardsFromTopicsResult(topics, { useMaterials });
                 setAiError(result.error);
                 setAiRateLimited(result.rateLimited ?? false);
+                setMaterialContext(result.materialContext);
                 setAiSummary(`${aiSourceName(result.source)} hat ${result.data.length} Karten vorbereitet.`);
               } finally {
                 setAiLoading(false);
@@ -95,6 +101,14 @@ export function StudyPlanPage() {
           >
             Flashcards erzeugen
           </button>
+        </div>
+        <div className="mt-4">
+          <MaterialsContextToggle
+            checked={useMaterials}
+            onChange={setUseMaterials}
+            disabled={isOfflineReadOnly}
+            materialContext={materialContext}
+          />
         </div>
         <p className="mt-4 text-sm text-slate-500">{aiSummary}</p>
         {aiRateLimited ? (

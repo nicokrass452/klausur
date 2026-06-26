@@ -1,6 +1,7 @@
 import { Brain, CheckCircle2, ClipboardList, Eye, GraduationCap, Layers3, Loader2, Send, Sparkles } from "lucide-react";
 import { FormEvent, useMemo, useRef, useState } from "react";
-import { hasSupabaseEnv, sendCoachChatResult, type CoachChatMessage, type CoachChatMode } from "../services/aiService";
+import { MaterialsContextToggle } from "../components/MaterialsContextToggle";
+import { hasSupabaseEnv, sendCoachChatResult, type CoachChatMessage, type CoachChatMode, type MaterialContextMeta } from "../services/aiService";
 import { useAppStore } from "../store/useAppStore";
 
 const modes: Array<{ id: CoachChatMode; label: string; icon: typeof Sparkles }> = [
@@ -118,6 +119,8 @@ export function CoachPage() {
   const [error, setError] = useState<string | undefined>();
   const [rateLimited, setRateLimited] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [useMaterials, setUseMaterials] = useState(false);
+  const [materialContext, setMaterialContext] = useState<MaterialContextMeta | undefined>();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const activeExams = useMemo(() => exams.filter((exam) => !exam.deletedAt), [exams]);
@@ -174,10 +177,11 @@ export function CoachPage() {
     setError(undefined);
 
     try {
-      const result = await sendCoachChatResult(mode, nextMessages, context);
+      const result = await sendCoachChatResult(mode, nextMessages, context, { useMaterials });
       setSource(result.source);
       setError(result.error);
       setRateLimited(result.rateLimited ?? false);
+      setMaterialContext(result.materialContext);
       setMessages([...nextMessages, { role: "assistant", content: result.data.message }]);
     } finally {
       setLoading(false);
@@ -217,6 +221,13 @@ export function CoachPage() {
             <span>{activeTopics.length} Themen</span>
             <span>{openTasks.length} offen</span>
             <span>{stats.streak} Streak</span>
+          </div>
+          <div className="mt-4">
+            <MaterialsContextToggle
+              checked={useMaterials}
+              onChange={setUseMaterials}
+              materialContext={materialContext}
+            />
           </div>
         </div>
       </aside>
