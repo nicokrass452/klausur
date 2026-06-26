@@ -1,5 +1,4 @@
-import { Bell, Download, MoonStar, SunMedium } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Bell, MoonStar, SunMedium } from "lucide-react";
 import { Outlet, useLocation } from "react-router-dom";
 import { APP_NAME } from "../lib/constants";
 import { PAGE_TITLES } from "../lib/navigation";
@@ -7,6 +6,7 @@ import { requestNotificationPermission } from "../services/notificationService";
 import { useAppStore } from "../store/useAppStore";
 import { AuthButton } from "./AuthButton";
 import { GuestBanner } from "./GuestBanner";
+import { InstallPromptBanner } from "./InstallPromptBanner";
 import { MobileNav } from "./MobileNav";
 import { OnboardingTutorial } from "./OnboardingTutorial";
 import { Sidebar } from "./Sidebar";
@@ -15,7 +15,6 @@ import { XpBadge } from "./XpBadge";
 
 export function Layout() {
   const location = useLocation();
-  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const rewardToast = useAppStore((state) => state.rewardToast);
   const clearRewardToast = useAppStore((state) => state.clearRewardToast);
   const stats = useAppStore((state) => state.stats);
@@ -25,16 +24,6 @@ export function Layout() {
   const isAuthenticated = useAppStore((state) => state.isAuthenticated);
   const authMode = useAppStore((state) => state.authMode);
   const isOfflineReadOnly = authMode === "offline-readonly";
-
-  useEffect(() => {
-    const handler = (event: Event) => {
-      const promptEvent = event as BeforeInstallPromptEvent;
-      promptEvent.preventDefault();
-      setInstallPrompt(promptEvent);
-    };
-    window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
-  }, []);
 
   const pageTitle = PAGE_TITLES[location.pathname] ?? "Klausurdetail";
 
@@ -72,19 +61,6 @@ export function Layout() {
                     >
                       <Bell size={17} />
                     </button>
-                    <button
-                      onClick={async () => {
-                        if (!installPrompt) return;
-                        await installPrompt.prompt();
-                        await installPrompt.userChoice;
-                        setInstallPrompt(null);
-                      }}
-                      className="hidden items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-semibold text-white lg:inline-flex dark:bg-teal-500 dark:text-slate-950"
-                      aria-label="App installieren"
-                    >
-                      <Download size={15} />
-                      Installieren
-                    </button>
                     <SyncStatusBadge />
                     <div className="md:hidden">
                       <XpBadge xp={stats.xp} level={stats.level} compact />
@@ -101,6 +77,7 @@ export function Layout() {
 
           <main className="mx-auto max-w-6xl px-4 py-5 pb-28 md:px-6 md:py-6 md:pb-8 lg:pb-6">
             {!isAuthenticated ? <GuestBanner /> : null}
+            {isAuthenticated ? <InstallPromptBanner /> : null}
             {isOfflineReadOnly ? (
               <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
                 Offline Read-Only Mode: You can view your last synced data. Editing is disabled until you're back online.
@@ -130,9 +107,4 @@ export function Layout() {
       {isAuthenticated ? <OnboardingTutorial /> : null}
     </div>
   );
-}
-
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 }

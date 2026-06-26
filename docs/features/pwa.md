@@ -38,8 +38,12 @@ supabase functions deploy send-push
 
 ## Install-Prompt
 
-- `beforeinstallprompt`-Event ist in `App.tsx` hinzugefügt.
-- TODO section (not implemented yet): Geführter Install-Flow muss noch im UI angezeigt werden.
+- `beforeinstallprompt`-Event wird von der Komponente `src/components/InstallPromptBanner.tsx` abgefangen.
+- Geführter Install-Flow: Ein dismissible Banner über dem Hauptinhalt (auch mobil sichtbar) erklärt die Vorteile und bietet einen "Installieren"-Button, der `prompt()` aufruft.
+- Dismissal wird in `localStorage` (`klausurplaner:install-prompt-dismissed`) als Zeitstempel gespeichert und nach 30 Tagen erneut angezeigt, damit Nutzer nicht dauerhaft genervt werden.
+- `appinstalled`-Event blendet das Banner dauerhaft aus und entfernt das Dismissal-Flag.
+- Im Standalone-/Installationsmodus (bereits installiert) wird das Banner gar nicht erst eingeblendet.
+- Texte sind i18n-fähig (`install.*` Keys in `src/locales/de.ts` und `en.ts`).
 
 ## VAPID Key Rotation
 

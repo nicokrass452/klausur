@@ -45,6 +45,12 @@ export const en: Record<TranslationKey, string> = {
   "settings.pendingWrites": "Pending offline changes",
   "settings.offline": "Offline: changes are queued locally and synced later.",
 
+  // PWA install prompt
+  "install.title": "Install app",
+  "install.body": "Install the exam planner for faster access and offline use — right from your home screen.",
+  "install.action": "Install",
+  "install.dismiss": "Later",
+
   // Sync status
   "sync.off": "Sync off",
   "sync.offline": "Offline",

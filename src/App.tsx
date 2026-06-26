@@ -76,18 +76,6 @@ export default function App() {
   }, [isAuthenticated, cloudSyncEnabled, syncNow]);
 
   useEffect(() => {
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      // Only show prompt logic could be added here later (e.g. state.setInstallPromptEvent(e))
-      // Currently, it holds the event. In a full implementation, you'd save `e` to a global state
-      // and show a custom install button.
-      (window as any).deferredPrompt = e;
-    };
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-  }, []);
-
-  useEffect(() => {
     if (!hydrated || !authReady || hasAutoRedistributed.current) return;
     if (!isAuthenticated || authMode === "offline-readonly") return;
 

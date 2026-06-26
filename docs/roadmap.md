@@ -4,6 +4,8 @@ Diese Liste beschreibt, was für ein **produktionsreifes Produkt jenseits des MV
 
 ## Abgeschlossen in diesem Durchlauf
 
+- KI-Kontext aus Materialien: Coach-Chat erhält Notizen (Inhalt), PDFs (Titel/Dateiname) und Videos (Titel/URL) als Kontext
+- Geführter PWA Install-Prompt-Flow: dismissible Install-Banner, mobil sichtbar, mit `appinstalled`-Behandlung
 - Überspringbares Tutorial, Sync-Retry in der Hauptnavigation, automatische Neuverteilung verpasster Aufgaben
 - iCal/Google-Calendar Export, Analytics CSV + XP-Trends
 - KI Provider-Hinweis + Rate-Limit-Feedback
@@ -58,7 +60,7 @@ Diese Liste beschreibt, was für ein **produktionsreifes Produkt jenseits des MV
 |--------|-------|-------------|
 | ✅ | Edge Function Pflicht | Proaktiver Hinweis auf aktiven KI-Modus (Edge Function vs. Mock-Fallback) in Coach, ExamDetail und StudyPlan. |
 | ✅ | Rate-Limit-Feedback | HTTP-429 wird in `aiService` erkannt und als prominentes Rate-Limit-Feedback in Coach, ExamDetail und StudyPlan angezeigt. |
-| ⬜ | KI-Kontext aus Materialien | Coach kennt hochgeladene PDFs/Notizen noch nicht. |
+| ✅ | KI-Kontext aus Materialien | Coach-Chat erhält Notizen (Inhalt), PDFs (Titel/Dateiname) und Videos (Titel/URL) als Kontext. Echte PDF-Textextraktion bleibt zurückgestellt. |
 
 ### PWA & Benachrichtigungen
 
@@ -66,7 +68,7 @@ Diese Liste beschreibt, was für ein **produktionsreifes Produkt jenseits des MV
 |--------|-------|-------------|
 | ✅ | Service Worker | Caching-Strategie für App-Shell in public/service-worker.js via Stale-While-Revalidate optimiert. |
 | ✅ | Web Push | `push_subscriptions` Tabelle, `subscribe-push` + `send-push` Edge Functions (VAPID-Signatur), Service-Worker Push/Click Handler und Aktivierungs-Button in Settings. |
-| ⬜ | Install-Prompt-Flow | `beforeinstallprompt`-Event in `App.tsx` hinzugefügt, geführter Flow muss noch im UI angezeigt werden. |
+| ✅ | Install-Prompt-Flow | Geführter Install-Banner (dismissible, persistent, mobil sichtbar) in `InstallPromptBanner`; `beforeinstallprompt` + `appinstalled` werden behandelt. |
 
 ### UI & UX
 
@@ -87,16 +89,16 @@ Diese Liste beschreibt, was für ein **produktionsreifes Produkt jenseits des MV
 
 ## Nächste Prioritäten
 
-1. KI-Kontext aus Materialien (Storage → ai-coach)
-2. Lerngruppen / geteilte Pläne
-3. Vollständige i18n (EN) und Accessibility-Audit
-4. Realtime / inkrementeller Sync
-5. Adaptive Lernplanung
+1. Lerngruppen / geteilte Pläne
+2. Vollständige i18n (EN) und Accessibility-Audit
+3. Realtime / inkrementeller Sync
+4. Adaptive Lernplanung
+5. Echte PDF-Textextraktion für KI-Kontext
 
 ## Explizit zurückgestellt
 
 - Lerngruppen / geteilte Pläne (Schema, Invites, RLS, UI — mehrere Tage)
 - Vollständige i18n (nur Foundation; restliche Strings extrahieren)
-- Echter KI-Kontext aus hochgeladenen Materialien
+- Echte PDF-Textextraktion für KI-Kontext (Metadaten + Notizinhalt sind bereits verfügbar)
 - Realtime inkrementeller Sync (architektureller Umbau)
 - Multi-Device Session Management
