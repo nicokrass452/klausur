@@ -5,6 +5,8 @@ export type TaskStatus = "open" | "done" | "missed";
 export type MaterialType = "pdf" | "note" | "video";
 export type SyncStatus = "idle" | "syncing" | "error" | "success" | "queued" | "pending_offline";
 
+export type AuthMode = 'online' | 'offline-readonly' | 'signed-out';
+
 export interface SyncableEntity {
   userId?: string;
   updatedAt: string;
@@ -56,6 +58,20 @@ export interface StudyMaterial extends SyncableEntity {
   createdAt: string;
 }
 
+export type MaterialChunkSource = "pdf" | "note";
+
+/** A retrievable text chunk extracted from a user's study material (PDF or note). */
+export interface MaterialChunk extends SyncableEntity {
+  id: string;
+  materialId: string;
+  examId: string;
+  chunkIndex: number;
+  source: MaterialChunkSource;
+  content: string;
+  tokenCount: number;
+  createdAt: string;
+}
+
 export interface FocusSession extends SyncableEntity {
   id: string;
   startedAt: string;
@@ -92,6 +108,20 @@ export interface UserProfile {
   updatedAt: string;
 }
 
+export type User =
+  | (UserProfile & { source: "online" })
+  | {
+      id: string;
+      source: "offline_grant";
+      email?: undefined;
+      fullName?: undefined;
+      avatarUrl?: undefined;
+      provider?: undefined;
+      cloudSyncEnabled?: undefined;
+      createdAt?: undefined;
+      updatedAt?: undefined;
+    };
+
 export interface ReminderSettings {
   dailyReminder: boolean;
   todayLearningReminder: boolean;
@@ -106,6 +136,7 @@ export interface AppSettings {
   reminders: ReminderSettings;
   cloudSyncEnabled: boolean;
   tutorialCompleted: boolean;
+  language: "de" | "en";
 }
 
 export interface QuizQuestion {
@@ -133,7 +164,7 @@ export interface AppSnapshot {
   materials: StudyMaterial[];
   stats: UserStats;
   settings: AppSettings;
-  user: UserProfile | null;
+  user: User | null;
   isAuthenticated: boolean;
   syncStatus: SyncStatus;
   lastSyncedAt?: string;
@@ -156,7 +187,7 @@ export interface OfflineSnapshot {
   materials: StudyMaterial[];
   stats: UserStats;
   settings: AppSettings;
-  user: UserProfile | null;
+  user: User | null;
   isAuthenticated: boolean;
   lastSyncedAt?: string;
 }

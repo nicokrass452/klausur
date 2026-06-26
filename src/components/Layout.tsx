@@ -23,6 +23,8 @@ export function Layout() {
   const setTheme = useAppStore((state) => state.setTheme);
   const updateReminderSettings = useAppStore((state) => state.updateReminderSettings);
   const isAuthenticated = useAppStore((state) => state.isAuthenticated);
+  const authMode = useAppStore((state) => state.authMode);
+  const isOfflineReadOnly = authMode === "offline-readonly";
 
   useEffect(() => {
     const handler = (event: Event) => {
@@ -51,6 +53,7 @@ export function Layout() {
               <div className="flex shrink-0 items-center gap-2 md:gap-3">
                 <button
                   onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                  disabled={isOfflineReadOnly}
                   className="inline-flex size-10 items-center justify-center rounded-xl border border-slate-200/80 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                   aria-label="Theme wechseln"
                 >
@@ -63,6 +66,7 @@ export function Layout() {
                         const permission = await requestNotificationPermission();
                         updateReminderSettings({ notificationsEnabled: permission === "granted" });
                       }}
+                      disabled={isOfflineReadOnly}
                       className="hidden size-10 items-center justify-center rounded-xl border border-slate-200/80 bg-white text-slate-700 md:inline-flex dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                       aria-label="Benachrichtigungen"
                     >
@@ -76,6 +80,7 @@ export function Layout() {
                         setInstallPrompt(null);
                       }}
                       className="hidden items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-semibold text-white lg:inline-flex dark:bg-teal-500 dark:text-slate-950"
+                      aria-label="App installieren"
                     >
                       <Download size={15} />
                       Installieren
@@ -96,6 +101,11 @@ export function Layout() {
 
           <main className="mx-auto max-w-6xl px-4 py-5 pb-28 md:px-6 md:py-6 md:pb-8 lg:pb-6">
             {!isAuthenticated ? <GuestBanner /> : null}
+            {isOfflineReadOnly ? (
+              <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
+                Offline Read-Only Mode: You can view your last synced data. Editing is disabled until you're back online.
+              </div>
+            ) : null}
             <Outlet />
           </main>
         </div>
@@ -105,6 +115,9 @@ export function Layout() {
         <button
           onClick={clearRewardToast}
           className="fixed right-4 top-20 z-50 rounded-2xl bg-slate-950 px-4 py-3 text-left text-white shadow-panel dark:bg-teal-500 dark:text-slate-950"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
         >
           <p className="text-xs font-semibold uppercase tracking-[0.2em]">XP Update</p>
           <p className="mt-1 text-sm font-medium">

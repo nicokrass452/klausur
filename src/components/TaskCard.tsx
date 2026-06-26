@@ -7,9 +7,10 @@ interface TaskCardProps {
   exam?: Exam;
   onComplete: () => void;
   onMissed?: () => void;
+  disabled?: boolean;
 }
 
-export function TaskCard({ task, exam, onComplete, onMissed }: TaskCardProps) {
+export function TaskCard({ task, exam, onComplete, onMissed, disabled }: TaskCardProps) {
   return (
     <article className="surface-card p-4">
       <div className="flex items-start justify-between gap-4">
@@ -23,6 +24,7 @@ export function TaskCard({ task, exam, onComplete, onMissed }: TaskCardProps) {
       <div className="mt-4 flex gap-2">
         <button
           onClick={onComplete}
+          disabled={disabled}
           className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400"
         >
           {task.status === "done" ? <CheckCircle2 size={16} /> : <Circle size={16} />}
@@ -31,6 +33,7 @@ export function TaskCard({ task, exam, onComplete, onMissed }: TaskCardProps) {
         {onMissed ? (
           <button
             onClick={onMissed}
+            disabled={disabled}
             className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-400 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:text-white"
           >
             <RotateCcw size={16} />

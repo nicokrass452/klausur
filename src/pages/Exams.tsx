@@ -1,12 +1,15 @@
 import { useMemo, useState } from "react";
+import { CalendarArrowDown } from "lucide-react";
 import { ExamCard } from "../components/ExamCard";
 import { useAppStore } from "../store/useAppStore";
+import { downloadIcalFile, examsToIcal } from "../utils/icalExport";
 
 export function ExamsPage() {
   const addExam = useAppStore((state) => state.addExam);
   const allExams = useAppStore((state) => state.exams);
   const allTopics = useAppStore((state) => state.topics);
   const defaultDailyMinutes = useAppStore((state) => state.settings.defaultDailyMinutes);
+  const isOfflineReadOnly = useAppStore((state) => state.authMode === "offline-readonly");
   const exams = useMemo(() => allExams.filter((entry) => !entry.deletedAt), [allExams]);
   const topics = useMemo(() => allTopics.filter((entry) => !entry.deletedAt), [allTopics]);
   const [subject, setSubject] = useState("");
@@ -37,6 +40,7 @@ export function ExamsPage() {
             setDailyMinutes(defaultDailyMinutes);
           }}
         >
+          <fieldset disabled={isOfflineReadOnly} className="contents disabled:opacity-60">
           <label className="space-y-2 text-sm font-medium text-slate-600 dark:text-slate-300">
             Fach
             <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950" value={subject} onChange={(event) => setSubject(event.target.value)} required />
@@ -72,10 +76,24 @@ export function ExamsPage() {
           <button className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white dark:bg-teal-500 dark:text-slate-950 md:col-span-2" type="submit">
             Klausur speichern
           </button>
+          </fieldset>
         </form>
       </section>
 
       <section className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="font-display text-2xl text-slate-950 dark:text-white">Deine Klausuren</h3>
+          {exams.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => downloadIcalFile(examsToIcal(exams), "klausurplaner-klausuren.ics")}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
+            >
+              <CalendarArrowDown size={16} />
+              Als Kalender exportieren (.ics)
+            </button>
+          ) : null}
+        </div>
         {exams.map((exam) => (
           <ExamCard key={exam.id} exam={exam} topics={topics} />
         ))}

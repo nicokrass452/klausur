@@ -1,7 +1,8 @@
 import { WandSparkles } from "lucide-react";
 import { useMemo, useState } from "react";
+import { MaterialsContextToggle } from "../components/MaterialsContextToggle";
 import { TaskCard } from "../components/TaskCard";
-import { generateFlashcardsFromTopicsResult, generateQuizFromTopicsResult, optimizeStudyPlanWithAiResult } from "../services/aiService";
+import { generateFlashcardsFromTopicsResult, generateQuizFromTopicsResult, hasSupabaseEnv, optimizeStudyPlanWithAiResult, type MaterialContextMeta } from "../services/aiService";
 import { useAppStore } from "../store/useAppStore";
 
 function aiSourceName(source: "glm" | "deepseek" | "mock"): string {
@@ -16,9 +17,13 @@ export function StudyPlanPage() {
   const allTopics = useAppStore((state) => state.topics);
   const setTaskStatus = useAppStore((state) => state.setTaskStatus);
   const redistributeMissed = useAppStore((state) => state.redistributeMissed);
-  const [aiSummary, setAiSummary] = useState("Mock-Interfaces für KI-Optimierung, Quiz und Flashcards.");
+  const isOfflineReadOnly = useAppStore((state) => state.authMode === "offline-readonly");
+  const [aiSummary, setAiSummary] = useState(hasSupabaseEnv ? "KI über Supabase Edge Function bereit." : "Mock-Fallback (kein Supabase-Setup).");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | undefined>();
+  const [aiRateLimited, setAiRateLimited] = useState(false);
+  const [useMaterials, setUseMaterials] = useState(false);
+  const [materialContext, setMaterialContext] = useState<MaterialContextMeta | undefined>();
 
   const exams = useMemo(() => allExams.filter((entry) => !entry.deletedAt), [allExams]);
   const studyTasks = useMemo(() => allStudyTasks.filter((entry) => !entry.deletedAt), [allStudyTasks]);
@@ -33,7 +38,7 @@ export function StudyPlanPage() {
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Lernplan Generator</p>
             <h3 className="mt-2 font-display text-2xl text-slate-950 dark:text-white">Automatische Verteilung mit Spaced Repetition</h3>
           </div>
-          <button onClick={redistributeMissed} className="rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">
+          <button disabled={isOfflineReadOnly} onClick={redistributeMissed} className="rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200">
             Verpasste neu verteilen
           </button>
         </div>
@@ -43,8 +48,10 @@ export function StudyPlanPage() {
               setAiLoading(true);
               setAiError(undefined);
               try {
-                const result = await optimizeStudyPlanWithAiResult(sortedTasks);
+                const result = await optimizeStudyPlanWithAiResult(sortedTasks, { useMaterials });
                 setAiError(result.error);
+                setAiRateLimited(result.rateLimited ?? false);
+                setMaterialContext(result.materialContext);
                 setAiSummary(`${aiSourceName(result.source)} priorisiert ${result.data.slice(0, 3).map((task) => task.task).join(", ")}.`);
               } finally {
                 setAiLoading(false);
@@ -61,8 +68,10 @@ export function StudyPlanPage() {
               setAiLoading(true);
               setAiError(undefined);
               try {
-                const result = await generateQuizFromTopicsResult(topics);
+                const result = await generateQuizFromTopicsResult(topics, { useMaterials });
                 setAiError(result.error);
+                setAiRateLimited(result.rateLimited ?? false);
+                setMaterialContext(result.materialContext);
                 setAiSummary(`${aiSourceName(result.source)} hat ${result.data.length} Fragen aus deinen Themen erzeugt.`);
               } finally {
                 setAiLoading(false);
@@ -78,8 +87,10 @@ export function StudyPlanPage() {
               setAiLoading(true);
               setAiError(undefined);
               try {
-                const result = await generateFlashcardsFromTopicsResult(topics);
+                const result = await generateFlashcardsFromTopicsResult(topics, { useMaterials });
                 setAiError(result.error);
+                setAiRateLimited(result.rateLimited ?? false);
+                setMaterialContext(result.materialContext);
                 setAiSummary(`${aiSourceName(result.source)} hat ${result.data.length} Karten vorbereitet.`);
               } finally {
                 setAiLoading(false);
@@ -91,8 +102,21 @@ export function StudyPlanPage() {
             Flashcards erzeugen
           </button>
         </div>
+        <div className="mt-4">
+          <MaterialsContextToggle
+            checked={useMaterials}
+            onChange={setUseMaterials}
+            disabled={isOfflineReadOnly}
+            materialContext={materialContext}
+          />
+        </div>
         <p className="mt-4 text-sm text-slate-500">{aiSummary}</p>
-        {aiError ? <p className="mt-2 text-sm text-amber-600 dark:text-amber-300">Fallback aktiv: {aiError}</p> : null}
+        {aiRateLimited ? (
+          <p className="mt-2 text-sm font-semibold text-rose-600 dark:text-rose-300" role="status" aria-live="polite">
+            KI-Kontingent erschöpft — bitte kurz warten.
+          </p>
+        ) : null}
+        {aiError ? <p className="mt-2 text-sm text-amber-600 dark:text-amber-300">{aiError}</p> : null}
       </section>
 
       <section className="space-y-4">
@@ -103,6 +127,7 @@ export function StudyPlanPage() {
             exam={exams.find((exam) => exam.id === task.examId)}
             onComplete={() => setTaskStatus(task.id, task.status === "done" ? "open" : "done")}
             onMissed={() => setTaskStatus(task.id, "missed")}
+            disabled={isOfflineReadOnly}
           />
         ))}
       </section>

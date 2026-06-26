@@ -3,9 +3,10 @@ import type { Topic } from "../types";
 interface TopicChecklistProps {
   topics: Topic[];
   onToggle: (id: string) => void;
+  disabled?: boolean;
 }
 
-export function TopicChecklist({ topics, onToggle }: TopicChecklistProps) {
+export function TopicChecklist({ topics, onToggle, disabled }: TopicChecklistProps) {
   if (!topics.length) {
     return <p className="text-sm text-slate-500">Noch keine Themen angelegt.</p>;
   }
@@ -22,6 +23,7 @@ export function TopicChecklist({ topics, onToggle }: TopicChecklistProps) {
             type="checkbox"
             checked={topic.completed}
             onChange={() => onToggle(topic.id)}
+            disabled={disabled}
             className="h-5 w-5 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
           />
         </label>

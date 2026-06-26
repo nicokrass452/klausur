@@ -18,6 +18,16 @@ export function OnboardingTutorial() {
     wasCompleted.current = tutorialCompleted;
   }, [tutorialCompleted]);
 
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        completeTutorial();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [completeTutorial]);
+
   const step = TUTORIAL_STEPS[stepIndex];
   const isFirst = stepIndex === 0;
   const isLast = stepIndex === TUTORIAL_STEPS.length - 1;
@@ -71,7 +81,11 @@ export function OnboardingTutorial() {
           ))}
         </ul>
 
-        <div className="mt-8 flex items-center justify-between gap-3">
+        <p className="mt-4 text-xs text-slate-500">
+          Du kannst die Einführung jederzeit unter Einstellungen neu starten.
+        </p>
+
+        <div className="mt-6 flex items-center justify-between gap-3">
           <button
             type="button"
             disabled={isFirst}
@@ -81,20 +95,30 @@ export function OnboardingTutorial() {
             <ChevronLeft size={16} />
             Zurück
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (isLast) {
-                completeTutorial();
-                return;
-              }
-              setStepIndex((value) => Math.min(TUTORIAL_STEPS.length - 1, value + 1));
-            }}
-            className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white dark:bg-teal-500 dark:text-slate-950"
-          >
-            {isLast ? "Los geht's" : "Weiter"}
-            {!isLast ? <ChevronRight size={16} /> : null}
-          </button>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => completeTutorial()}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
+            >
+              Später
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (isLast) {
+                  completeTutorial();
+                  return;
+                }
+                setStepIndex((value) => Math.min(TUTORIAL_STEPS.length - 1, value + 1));
+              }}
+              className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white dark:bg-teal-500 dark:text-slate-950"
+            >
+              {isLast ? "Los geht's" : "Weiter"}
+              {!isLast ? <ChevronRight size={16} /> : null}
+            </button>
+          </div>
         </div>
       </div>
     </div>

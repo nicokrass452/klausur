@@ -1,6 +1,7 @@
 import { ArrowRight, CalendarClock, Flame, Timer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { InstallPromptCard } from "../components/InstallPromptCard";
 import { ProgressBar } from "../components/ProgressBar";
 import { StatCard } from "../components/StatCard";
 import { TaskCard } from "../components/TaskCard";
@@ -35,6 +36,7 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      <InstallPromptCard />
       <section className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         <article className="rounded-[28px] border border-teal-200/60 bg-gradient-to-br from-teal-500/95 via-cyan-400/90 to-orange-300/85 p-6 text-slate-950 shadow-panel md:p-7">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-900/70">Nächste Klausur</p>

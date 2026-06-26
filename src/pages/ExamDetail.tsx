@@ -1,12 +1,15 @@
 import { Link, useParams } from "react-router-dom";
 import { useMemo, useState } from "react";
-import { Brain, Layers3, Loader2, Upload, WandSparkles } from "lucide-react";
+import { Brain, CalendarArrowDown, Layers3, Loader2, Upload, WandSparkles } from "lucide-react";
 import { ROUTES } from "../lib/constants";
-import { generateFlashcardsFromTopicsResult, generateQuizFromTopicsResult, getCoachMessageResult, type AiResult } from "../services/aiService";
-import { saveMaterialBlob } from "../services/storageService";
+import { MaterialsContextToggle } from "../components/MaterialsContextToggle";
+import { generateFlashcardsFromTopicsResult, generateQuizFromTopicsResult, getCoachMessageResult, hasSupabaseEnv, type AiResult, type MaterialContextMeta } from "../services/aiService";
+import { buildChunksForMaterial } from "../services/materialChunkService";
+import { uploadMaterialWithOfflineFallback } from "../services/materialStorageService";
 import { useAppStore } from "../store/useAppStore";
-import type { CoachMessage, Flashcard, QuizQuestion } from "../types";
+import type { CoachMessage, Flashcard, QuizQuestion, StudyMaterial } from "../types";
 import { formatDateTime } from "../utils/dateUtils";
+import { downloadIcalFile, examsToIcal } from "../utils/icalExport";
 import { getExamProgress } from "../utils/examUtils";
 import { ProgressBar } from "../components/ProgressBar";
 import { TopicChecklist } from "../components/TopicChecklist";
@@ -29,9 +32,14 @@ export function ExamDetailPage() {
   const addTopic = useAppStore((state) => state.addTopic);
   const toggleTopic = useAppStore((state) => state.toggleTopic);
   const addMaterial = useAppStore((state) => state.addMaterial);
+  const updateMaterial = useAppStore((state) => state.updateMaterial);
   const removeExam = useAppStore((state) => state.removeExam);
   const regenerateStudyPlan = useAppStore((state) => state.regenerateStudyPlan);
   const updateExam = useAppStore((state) => state.updateExam);
+  const user = useAppStore((state) => state.user);
+  const isOnline = useAppStore((state) => state.isOnline);
+  const cloudSyncEnabled = useAppStore((state) => state.settings.cloudSyncEnabled);
+  const isOfflineReadOnly = useAppStore((state) => state.authMode === "offline-readonly");
   const [topicName, setTopicName] = useState("");
   const [topicDifficulty, setTopicDifficulty] = useState(3);
   const [estimatedMinutes, setEstimatedMinutes] = useState(30);
@@ -47,7 +55,11 @@ export function ExamDetailPage() {
   const [knowledgeLevel, setKnowledgeLevel] = useState(exam?.knowledgeLevel ?? 3);
   const [aiLoading, setAiLoading] = useState<AiPanel | null>(null);
   const [aiError, setAiError] = useState<string | undefined>();
+  const [aiRateLimited, setAiRateLimited] = useState(false);
   const [aiSource, setAiSource] = useState<AiResult<unknown>["source"] | undefined>();
+  const [useMaterials, setUseMaterials] = useState(false);
+  const [materialContext, setMaterialContext] = useState<MaterialContextMeta | undefined>();
+  const [chunkStatus, setChunkStatus] = useState<string | undefined>();
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [coachMessage, setCoachMessage] = useState<CoachMessage | null>(null);
@@ -70,25 +82,50 @@ export function ExamDetailPage() {
   async function runAiAction(panel: AiPanel): Promise<void> {
     setAiLoading(panel);
     setAiError(undefined);
+    const options = { useMaterials, examId: id };
     try {
       if (panel === "quiz") {
-        const result = await generateQuizFromTopicsResult(topics);
+        const result = await generateQuizFromTopicsResult(topics, options);
         setQuizQuestions(result.data);
         setAiSource(result.source);
         setAiError(result.error);
+        setAiRateLimited(result.rateLimited ?? false);
+        setMaterialContext(result.materialContext);
       } else if (panel === "flashcards") {
-        const result = await generateFlashcardsFromTopicsResult(topics);
+        const result = await generateFlashcardsFromTopicsResult(topics, options);
         setFlashcards(result.data);
         setAiSource(result.source);
         setAiError(result.error);
+        setAiRateLimited(result.rateLimited ?? false);
+        setMaterialContext(result.materialContext);
       } else {
-        const result = await getCoachMessageResult(stats, examTasks);
+        const result = await getCoachMessageResult(stats, examTasks, options);
         setCoachMessage(result.data);
         setAiSource(result.source);
         setAiError(result.error);
+        setAiRateLimited(result.rateLimited ?? false);
+        setMaterialContext(result.materialContext);
       }
     } finally {
       setAiLoading(null);
+    }
+  }
+
+  async function extractChunksForMaterial(material: StudyMaterial, pdfBlob?: Blob): Promise<void> {
+    if (isOfflineReadOnly || !user?.id) return;
+    try {
+      const chunks = await buildChunksForMaterial({ material, userId: user.id, pdfBlob });
+      setChunkStatus(
+        chunks.length > 0
+          ? `${chunks.length} ${chunks.length === 1 ? "Chunk" : "Chunks"} aus „${material.title}" extrahiert.`
+          : `Kein Text aus „${material.title}" extrahierbar.`
+      );
+    } catch (error) {
+      setChunkStatus(
+        error instanceof Error
+          ? `Chunk-Extraktion fehlgeschlagen: ${error.message}`
+          : "Chunk-Extraktion fehlgeschlagen."
+      );
     }
   }
 
@@ -101,11 +138,29 @@ export function ExamDetailPage() {
             <h3 className="mt-2 font-display text-3xl text-slate-950 dark:text-white">{exam.subject}</h3>
             <p className="mt-2 text-sm text-slate-500">{formatDateTime(exam.date, exam.time)} · Raum {exam.room || "-"}</p>
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => regenerateStudyPlan(exam.id)} className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => downloadIcalFile(examsToIcal([exam]), "klausurplaner-klausur.ics")}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
+            >
+              <CalendarArrowDown size={16} />
+              Als Kalender exportieren (.ics)
+            </button>
+            <button disabled={isOfflineReadOnly} onClick={() => regenerateStudyPlan(exam.id)} className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200">
               Lernplan neu erzeugen
             </button>
-            <Link to={ROUTES.exams} onClick={() => removeExam(exam.id)} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">
+            <Link
+              to={ROUTES.exams}
+              onClick={(event) => {
+                if (isOfflineReadOnly) {
+                  event.preventDefault();
+                  return;
+                }
+                removeExam(exam.id);
+              }}
+              aria-disabled={isOfflineReadOnly}
+              className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white aria-disabled:opacity-50"
+            >
               Löschen
             </Link>
           </div>
@@ -152,10 +207,21 @@ export function ExamDetailPage() {
           </div>
         </div>
 
-        {aiSource ? (
-          <p className="mt-4 text-sm text-slate-500">
-            Quelle: {aiSourceLabel(aiSource)}
-            {aiError ? ` - ${aiError}` : ""}
+        <p className="mt-4 text-sm text-slate-500">
+          {aiSource ? `Quelle: ${aiSourceLabel(aiSource)}` : hasSupabaseEnv ? "KI über Supabase Edge Function" : "Mock-Fallback (kein Supabase-Setup)"}
+          {aiError ? ` — ${aiError}` : ""}
+        </p>
+        <div className="mt-3">
+          <MaterialsContextToggle
+            checked={useMaterials}
+            onChange={setUseMaterials}
+            disabled={isOfflineReadOnly}
+            materialContext={materialContext}
+          />
+        </div>
+        {aiRateLimited ? (
+          <p className="mt-2 text-sm font-semibold text-rose-600 dark:text-rose-300" role="status" aria-live="polite">
+            KI-Kontingent erschöpft — bitte kurz warten.
           </p>
         ) : null}
 
@@ -203,6 +269,7 @@ export function ExamDetailPage() {
             className="mt-5 grid gap-4 md:grid-cols-2"
             onSubmit={(event) => {
               event.preventDefault();
+              if (isOfflineReadOnly) return;
               updateExam(exam.id, { subject, date, time, room, notes, difficulty, knowledgeLevel });
               regenerateStudyPlan(exam.id);
             }}
@@ -214,7 +281,7 @@ export function ExamDetailPage() {
             <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950" type="number" min="1" max="5" value={difficulty} onChange={(event) => setDifficulty(Number(event.target.value))} />
             <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950" type="number" min="1" max="5" value={knowledgeLevel} onChange={(event) => setKnowledgeLevel(Number(event.target.value))} />
             <textarea className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950 md:col-span-2" value={notes} onChange={(event) => setNotes(event.target.value)} />
-            <button className="rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white dark:bg-teal-500 dark:text-slate-950 md:col-span-2" type="submit">
+            <button disabled={isOfflineReadOnly} className="rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50 dark:bg-teal-500 dark:text-slate-950 md:col-span-2" type="submit">
               Klausur aktualisieren
             </button>
           </form>
@@ -224,6 +291,7 @@ export function ExamDetailPage() {
             className="mt-5 space-y-4"
             onSubmit={(event) => {
               event.preventDefault();
+              if (isOfflineReadOnly) return;
               addTopic({ examId: exam.id, name: topicName, difficulty: topicDifficulty, estimatedMinutes });
               setTopicName("");
               setTopicDifficulty(3);
@@ -235,36 +303,57 @@ export function ExamDetailPage() {
               <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950" type="number" min="1" max="5" value={topicDifficulty} onChange={(event) => setTopicDifficulty(Number(event.target.value))} />
               <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950" type="number" min="10" step="5" value={estimatedMinutes} onChange={(event) => setEstimatedMinutes(Number(event.target.value))} />
             </div>
-            <button className="rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white dark:bg-teal-500 dark:text-slate-950" type="submit">
+            <button disabled={isOfflineReadOnly} className="rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50 dark:bg-teal-500 dark:text-slate-950" type="submit">
               Thema hinzufügen
             </button>
           </form>
           <div className="mt-6">
-            <TopicChecklist topics={topics} onToggle={toggleTopic} />
+            <TopicChecklist topics={topics} onToggle={toggleTopic} disabled={isOfflineReadOnly} />
           </div>
         </section>
 
         <section className="rounded-[32px] border border-white/50 bg-white/80 p-6 shadow-panel dark:border-slate-800 dark:bg-slate-900/80">
           <h4 className="font-display text-2xl text-slate-950 dark:text-white">Lernmaterial</h4>
+          <p className="mt-2 text-sm text-slate-500">
+            Notizen und PDFs werden automatisch in Text-Chunks zerlegt und stehen dem KI-Coach als Kontext zur Verfügung, sobald du „Hochgeladene Materialien nutzen" aktivierst.
+          </p>
+          {chunkStatus ? (
+            <p className="mt-2 text-sm text-teal-700 dark:text-teal-300" role="status" aria-live="polite">{chunkStatus}</p>
+          ) : null}
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <form
               className="space-y-3 rounded-3xl border border-dashed border-slate-300 p-4 dark:border-slate-700"
               onSubmit={(event) => {
                 event.preventDefault();
+                if (isOfflineReadOnly) return;
                 if (!noteDraft.trim()) return;
-                addMaterial({ examId: exam.id, type: "note", title: "Notiz", content: noteDraft });
+                const materialId = addMaterial({ examId: exam.id, type: "note", title: "Notiz", content: noteDraft });
+                const now = new Date().toISOString();
+                const material: StudyMaterial = {
+                  id: materialId,
+                  userId: user?.id,
+                  examId: exam.id,
+                  type: "note",
+                  title: "Notiz",
+                  content: noteDraft,
+                  createdAt: now,
+                  updatedAt: now,
+                  deletedAt: null
+                };
+                void extractChunksForMaterial(material);
                 setNoteDraft("");
               }}
             >
               <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Notiz speichern</p>
               <textarea className="min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950" value={noteDraft} onChange={(event) => setNoteDraft(event.target.value)} />
-              <button className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-500 dark:text-slate-950" type="submit">Notiz ablegen</button>
+              <button disabled={isOfflineReadOnly} className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 dark:bg-teal-500 dark:text-slate-950" type="submit">Notiz ablegen</button>
             </form>
 
             <form
               className="space-y-3 rounded-3xl border border-dashed border-slate-300 p-4 dark:border-slate-700"
               onSubmit={(event) => {
                 event.preventDefault();
+                if (isOfflineReadOnly) return;
                 if (!videoTitle.trim() || !videoUrl.trim()) return;
                 addMaterial({ examId: exam.id, type: "video", title: videoTitle, url: videoUrl });
                 setVideoTitle("");
@@ -274,26 +363,58 @@ export function ExamDetailPage() {
               <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Video-Link speichern</p>
               <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950" placeholder="Titel" value={videoTitle} onChange={(event) => setVideoTitle(event.target.value)} />
               <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950" placeholder="https://youtube.com/..." value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} />
-              <button className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white dark:bg-teal-500 dark:text-slate-950" type="submit">Link speichern</button>
+              <button disabled={isOfflineReadOnly} className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 dark:bg-teal-500 dark:text-slate-950" type="submit">Link speichern</button>
             </form>
 
             <label className="space-y-3 rounded-3xl border border-dashed border-slate-300 p-4 dark:border-slate-700 md:col-span-2">
-              <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">PDF Upload vorbereiten</span>
+              <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">PDF Upload</span>
               <input
                 type="file"
                 accept="application/pdf"
+                disabled={isOfflineReadOnly}
                 className="block w-full text-sm text-slate-500 file:mr-4 file:rounded-full file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:font-semibold file:text-white dark:file:bg-teal-500 dark:file:text-slate-950"
                 onChange={async (event) => {
+                  if (isOfflineReadOnly) return;
                   const file = event.target.files?.[0];
                   if (!file) return;
-                  const id = addMaterial({ examId: exam.id, type: "pdf", title: file.name, fileName: file.name });
-                  await saveMaterialBlob(id, file);
+                  const materialId = addMaterial({ examId: exam.id, type: "pdf", title: file.name, fileName: file.name });
+                  const now = new Date().toISOString();
+                  let materialUrl: string | undefined;
+                  try {
+                    const result = await uploadMaterialWithOfflineFallback(
+                      file,
+                      exam.id,
+                      materialId,
+                      user?.id ?? "anonymous",
+                      isOnline && cloudSyncEnabled
+                    );
+                    materialUrl = result.publicUrl ?? result.path;
+                    updateMaterial(materialId, { url: materialUrl, fileName: result.fileName });
+                  } catch {
+                    // IndexedDB fallback already handled inside uploadMaterialWithOfflineFallback.
+                  }
+                  const material: StudyMaterial = {
+                    id: materialId,
+                    userId: user?.id,
+                    examId: exam.id,
+                    type: "pdf",
+                    title: file.name,
+                    fileName: file.name,
+                    url: materialUrl,
+                    createdAt: now,
+                    updatedAt: now,
+                    deletedAt: null
+                  };
+                  void extractChunksForMaterial(material, file);
                   event.target.value = "";
                 }}
               />
-              <div className="flex items-center gap-2 text-sm text-slate-500">
-                <Upload size={16} />
-                Dateien werden für späteren Viewer in IndexedDB gespeichert.
+              <div className="space-y-1 text-sm text-slate-500">
+                <div className="flex items-center gap-2">
+                  <Upload size={16} />
+                  {isOnline && cloudSyncEnabled ? "PDF wird nach Supabase Storage hochgeladen (max. 10 MB)." : "Offline: PDF wird lokal in IndexedDB zwischengespeichert."}
+                </div>
+                <p className="text-xs">Nur PDF-Dateien bis 10 MB werden unterstützt.</p>
               </div>
             </label>
           </div>
@@ -302,7 +423,19 @@ export function ExamDetailPage() {
             {materials.map((material) => (
               <div key={material.id} className="rounded-2xl border border-slate-200/80 px-4 py-3 dark:border-slate-800">
                 <p className="font-medium text-slate-900 dark:text-white">{material.title}</p>
-                <p className="text-sm text-slate-500">{material.type === "note" ? material.content : material.url ?? material.fileName}</p>
+                {material.type === "note" ? (
+                  <p className="text-sm text-slate-500">{material.content}</p>
+                ) : material.type === "video" ? (
+                  <a href={material.url} target="_blank" rel="noreferrer" className="text-sm text-teal-600 hover:underline dark:text-teal-400">
+                    {material.url}
+                  </a>
+                ) : material.url ? (
+                  <a href={material.url} target="_blank" rel="noreferrer" className="text-sm text-teal-600 hover:underline dark:text-teal-400">
+                    {material.fileName ?? "PDF öffnen"}
+                  </a>
+                ) : (
+                  <p className="text-sm text-slate-500">{material.fileName}</p>
+                )}
               </div>
             ))}
           </div>

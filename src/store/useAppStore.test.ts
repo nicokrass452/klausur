@@ -4,7 +4,7 @@ import { useAppStore } from "./useAppStore";
 describe("useAppStore", () => {
   beforeEach(() => {
     // Clear the store before each test
-    useAppStore.setState({ exams: [], topics: [], materials: [], studyTasks: [] });
+    useAppStore.setState({ exams: [], topics: [], materials: [], studyTasks: [], authMode: "signed-out" });
   });
 
   it("should add a new exam and generate tasks and topics if not provided", () => {
@@ -56,5 +56,66 @@ describe("useAppStore", () => {
     // removeExam performs a soft delete by setting deletedAt
     expect(state.exams.length).toBe(1);
     expect(state.exams[0].deletedAt).toBeDefined();
+  });
+
+  it("rejects mutation attempts in offline read-only mode at the data layer", () => {
+    useAppStore.setState({ authMode: "offline-readonly" });
+
+    expect(() => useAppStore.getState().addExam({
+      subject: "Chemistry",
+      date: "2024-12-01",
+      time: "10:00",
+      room: "C1",
+      notes: "",
+      difficulty: 3,
+      knowledgeLevel: 2,
+      color: "#00ff00",
+      dailyMinutes: 30
+    })).toThrow("Cannot modify data in offline read-only mode");
+  });
+
+  it("redistributes missed open tasks to future dates", () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    const futureExamDate = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+
+    const examId = "exam-missed";
+    useAppStore.setState({
+      authMode: "signed-out",
+      exams: [{
+        id: examId,
+        subject: "Physics",
+        date: futureExamDate,
+        time: "10:00",
+        room: "A1",
+        notes: "",
+        difficulty: 3,
+        knowledgeLevel: 2,
+        color: "#0f766e",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        deletedAt: null,
+        dailyMinutes: 30
+      }],
+      studyTasks: [
+        { id: "task-yesterday", examId, date: yesterday, task: "Nachholen", duration: 30, type: "learn" as const, status: "open" as const, updatedAt: new Date().toISOString(), deletedAt: null },
+        { id: "task-today", examId, date: today, task: "Heute", duration: 30, type: "learn" as const, status: "open" as const, updatedAt: new Date().toISOString(), deletedAt: null },
+        { id: "task-tomorrow", examId, date: tomorrow, task: "Morgen", duration: 30, type: "learn" as const, status: "open" as const, updatedAt: new Date().toISOString(), deletedAt: null }
+      ]
+    });
+
+    useAppStore.getState().redistributeMissed();
+
+    const state = useAppStore.getState();
+    const yesterdayTask = state.studyTasks.find((task) => task.id === "task-yesterday");
+    const todayTask = state.studyTasks.find((task) => task.id === "task-today");
+    const tomorrowTask = state.studyTasks.find((task) => task.id === "task-tomorrow");
+
+    expect(yesterdayTask).toBeDefined();
+    expect(yesterdayTask!.date).not.toBe(yesterday);
+    expect(yesterdayTask!.date >= today).toBe(true);
+    expect(todayTask?.date).toBe(today);
+    expect(tomorrowTask?.date).toBe(tomorrow);
   });
 });

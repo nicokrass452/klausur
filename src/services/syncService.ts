@@ -263,6 +263,12 @@ export async function resetPasswordForEmail(email: string): Promise<void> {
   if (error) throw mapAuthError(error);
 }
 
+export async function resendConfirmationEmail(email: string): Promise<void> {
+  const client = requireSupabase();
+  const { error } = await client.auth.resend({ email, type: "signup" });
+  if (error) throw mapAuthError(error);
+}
+
 export async function deleteUserAccount(): Promise<void> {
   const client = requireSupabase();
   const { error } = await client.rpc("delete_user_account");
@@ -482,6 +488,9 @@ export async function syncUserStats(stats: UserStats, focusSessions: FocusSessio
 
 export async function pushToCloud(snapshot: AppSnapshot): Promise<void> {
   if (!snapshot.user) throw new Error("Kein eingeloggter Nutzer für Cloud Sync.");
+  if (snapshot.user.source !== "online") {
+    throw new Error("Offline Read-Only Nutzer koennen keine Cloud-Sync Schreibvorgaenge ausfuehren.");
+  }
   const client = requireSupabase();
   const userId = snapshot.user.id;
 

@@ -43,13 +43,31 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
-// TODO: Implement Web Push Notifications background sync here
 self.addEventListener("push", (event) => {
-  const data = event.data?.json() ?? { title: "Neue Benachrichtigung", body: "" };
+  const data = event.data?.json() ?? { title: "Neue Benachrichtigung", body: "Öffne den Klausurplaner für Details." };
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
-      icon: "/icons/icon-192.svg"
+      icon: "/icons/icon-192.svg",
+      badge: "/icons/icon-192.svg",
+      data: { url: data.url ?? "/dashboard" }
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url ?? "/dashboard";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url === url && "focus" in client) {
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(url);
+      }
     })
   );
 });

@@ -1,5 +1,7 @@
 import type { CoachMessage, Flashcard, QuizQuestion, StudyTask, Topic, UserStats } from "../types";
-import { getSupabaseRequestHeaders, supabase, supabaseAnonKey } from "../lib/supabase";
+import { getSupabaseRequestHeaders, hasSupabaseEnv, supabase, supabaseAnonKey, supabaseUrl } from "../lib/supabase";
+
+export { hasSupabaseEnv };
 
 type AiAction = "generateQuiz" | "generateFlashcards" | "optimizeStudyPlan" | "coachMessage" | "coachChat";
 type AiSource = "glm" | "deepseek" | "mock";
@@ -9,11 +11,31 @@ export interface CoachChatMessage {
   content: string;
 }
 
+/**
+ * Material context metadata returned by the Edge Function. The coach UI surfaces
+ * `used` and `chunkCount` so users can see when their uploaded notes/PDFs were
+ * consulted. RLS guarantees only the calling user's chunks are ever counted.
+ */
+export interface MaterialContextMeta {
+  used: boolean;
+  chunkCount: number;
+  examScoped: boolean;
+}
+
+/** Optional per-call options for the AI service. */
+export interface AiCallOptions {
+  /** When true, the Edge Function retrieves the user's material chunks. */
+  useMaterials?: boolean;
+  /** Scope retrieval to a single exam's materials (ExamDetail passes this). */
+  examId?: string;
+}
 
 export interface AiResult<T> {
   data: T;
   source: AiSource;
   error?: string;
+  rateLimited?: boolean;
+  materialContext?: MaterialContextMeta;
 }
 
 export interface CoachChatResponse {
@@ -103,6 +125,13 @@ function isCoachMessage(value: unknown): value is CoachMessage {
   return typeof item?.title === "string" && typeof item.body === "string";
 }
 
+export function isRateLimitedError(error: unknown): boolean {
+  const context = (error as { context?: unknown })?.context;
+  if (context instanceof Response && context.status === 429) return true;
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return message.includes("zu viele ki-anfragen") || message.includes("rate limit") || message.includes("429");
+}
+
 async function errorMessage(error: unknown): Promise<string> {
   const context = (error as { context?: unknown })?.context;
   if (context instanceof Response) {
@@ -134,32 +163,70 @@ async function invokeAiCoach<T>(
   action: AiAction,
   payload: Record<string, unknown>,
   pick: (value: unknown) => T,
-  fallback: () => Promise<T>
+  fallback: () => Promise<T>,
+  options?: AiCallOptions
 ): Promise<AiResult<T>> {
   try {
     if (!supabase) throw new Error("Supabase ist nicht konfiguriert.");
+    if (!supabaseUrl) throw new Error("Supabase URL fehlt. KI nutzt den Mock-Fallback.");
     if (!supabaseAnonKey) throw new Error("Supabase Anon Key fehlt. KI nutzt den Mock-Fallback.");
 
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError) throw sessionError;
     const accessToken = sessionData.session?.access_token;
 
-    const { data, error } = await supabase.functions.invoke("ai-coach", {
-      body: { action, payload },
-      headers: getSupabaseRequestHeaders(accessToken)
+    const payloadWithMaterials: Record<string, unknown> = { ...payload };
+    if (options?.useMaterials) {
+      payloadWithMaterials.useMaterials = true;
+      if (options.examId) payloadWithMaterials.examId = options.examId;
+    }
+
+    const response = await fetch(`${supabaseUrl}/functions/v1/ai-coach`, {
+      method: "POST",
+      headers: {
+        ...getSupabaseRequestHeaders(accessToken),
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ action, payload: payloadWithMaterials })
     });
 
-    if (error) throw error;
-    const parsed = data as { data?: unknown; error?: unknown; fallback?: boolean; source?: AiSource } | null;
+    if (!response.ok) {
+      const error = new Error(`Edge Function HTTP ${response.status}`) as Error & { context?: Response };
+      error.context = response;
+      throw error;
+    }
+
+    const data = await response.json();
+    const parsed = data as {
+      data?: unknown;
+      error?: unknown;
+      fallback?: boolean;
+      source?: AiSource;
+      materialContext?: MaterialContextMeta;
+    } | null;
     if (parsed?.fallback && typeof parsed.error === "string") console.warn(parsed.error);
 
-    return { data: pick(parsed?.data), source: parsed?.fallback ? "mock" : parsed?.source ?? "glm" };
+    return {
+      data: pick(parsed?.data),
+      source: parsed?.fallback ? "mock" : parsed?.source ?? "glm",
+      materialContext: parsed?.materialContext
+    };
   } catch (error) {
-    return { data: await fallback(), source: "mock", error: await errorMessage(error) };
+    const rateLimited = isRateLimitedError(error);
+    return {
+      data: await fallback(),
+      source: "mock",
+      error: rateLimited ? "KI-Kontingent erschöpft — bitte kurz warten." : await errorMessage(error),
+      rateLimited,
+      materialContext: { used: false, chunkCount: 0, examScoped: Boolean(options?.examId) }
+    };
   }
 }
 
-export async function optimizeStudyPlanWithAiResult(tasks: StudyTask[]): Promise<AiResult<StudyTask[]>> {
+export async function optimizeStudyPlanWithAiResult(
+  tasks: StudyTask[],
+  options?: AiCallOptions
+): Promise<AiResult<StudyTask[]>> {
   return invokeAiCoach(
     "optimizeStudyPlan",
     { tasks },
@@ -168,11 +235,15 @@ export async function optimizeStudyPlanWithAiResult(tasks: StudyTask[]): Promise
       if (!isStudyTasks(tasksResult)) throw new Error("Ungültige KI-Antwort für Lernplan.");
       return tasksResult;
     },
-    () => mockOptimizeStudyPlan(tasks)
+    () => mockOptimizeStudyPlan(tasks),
+    options
   );
 }
 
-export async function generateQuizFromTopicsResult(topics: Topic[]): Promise<AiResult<QuizQuestion[]>> {
+export async function generateQuizFromTopicsResult(
+  topics: Topic[],
+  options?: AiCallOptions
+): Promise<AiResult<QuizQuestion[]>> {
   return invokeAiCoach(
     "generateQuiz",
     { topics },
@@ -181,11 +252,15 @@ export async function generateQuizFromTopicsResult(topics: Topic[]): Promise<AiR
       if (!isQuizQuestions(questions)) throw new Error("Ungültige KI-Antwort für Quiz.");
       return questions;
     },
-    () => mockGenerateQuiz(topics)
+    () => mockGenerateQuiz(topics),
+    options
   );
 }
 
-export async function generateFlashcardsFromTopicsResult(topics: Topic[]): Promise<AiResult<Flashcard[]>> {
+export async function generateFlashcardsFromTopicsResult(
+  topics: Topic[],
+  options?: AiCallOptions
+): Promise<AiResult<Flashcard[]>> {
   return invokeAiCoach(
     "generateFlashcards",
     { topics },
@@ -194,11 +269,16 @@ export async function generateFlashcardsFromTopicsResult(topics: Topic[]): Promi
       if (!isFlashcards(flashcards)) throw new Error("Ungültige KI-Antwort für Flashcards.");
       return flashcards;
     },
-    () => mockGenerateFlashcards(topics)
+    () => mockGenerateFlashcards(topics),
+    options
   );
 }
 
-export async function getCoachMessageResult(stats: UserStats, tasks: StudyTask[]): Promise<AiResult<CoachMessage>> {
+export async function getCoachMessageResult(
+  stats: UserStats,
+  tasks: StudyTask[],
+  options?: AiCallOptions
+): Promise<AiResult<CoachMessage>> {
   return invokeAiCoach(
     "coachMessage",
     { stats, tasks },
@@ -206,14 +286,16 @@ export async function getCoachMessageResult(stats: UserStats, tasks: StudyTask[]
       if (!isCoachMessage(value)) throw new Error("Ungültige KI-Antwort für Coach.");
       return value;
     },
-    () => mockCoachMessage(stats, tasks)
+    () => mockCoachMessage(stats, tasks),
+    options
   );
 }
 
 export async function sendCoachChatResult(
   mode: CoachChatMode,
   messages: CoachChatMessage[],
-  context: Record<string, unknown>
+  context: Record<string, unknown>,
+  options?: AiCallOptions
 ): Promise<AiResult<CoachChatResponse>> {
   const lastUserMessage = [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
   const isGreeting = /^(hi|hallo|hey|moin|servus|hello)\b[!.?]*$/i.test(lastUserMessage.trim());
@@ -231,7 +313,8 @@ export async function sendCoachChatResult(
         : lastUserMessage
         ? `Ich kann den KI-Provider gerade nicht erreichen. Für "${lastUserMessage}" starte mit drei Punkten: Kernbegriffe sammeln, eine Beispielaufgabe lösen, offene Fragen notieren.`
         : "Ich kann den KI-Provider gerade nicht erreichen. Starte mit einer kurzen Wiederholung und formuliere danach eine konkrete Frage."
-    })
+    }),
+    options
   );
 }
 
