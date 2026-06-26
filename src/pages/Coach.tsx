@@ -105,6 +105,7 @@ export function CoachPage() {
   const exams = useAppStore((state) => state.exams);
   const topics = useAppStore((state) => state.topics);
   const studyTasks = useAppStore((state) => state.studyTasks);
+  const materials = useAppStore((state) => state.materials);
   const stats = useAppStore((state) => state.stats);
   const [mode, setMode] = useState<CoachChatMode>("coach");
   const [input, setInput] = useState("");
@@ -123,6 +124,7 @@ export function CoachPage() {
   const activeExams = useMemo(() => exams.filter((exam) => !exam.deletedAt), [exams]);
   const activeTopics = useMemo(() => topics.filter((topic) => !topic.deletedAt), [topics]);
   const activeTasks = useMemo(() => studyTasks.filter((task) => !task.deletedAt), [studyTasks]);
+  const activeMaterials = useMemo(() => materials.filter((material) => !material.deletedAt), [materials]);
   const openTasks = useMemo(() => activeTasks.filter((task) => task.status === "open"), [activeTasks]);
 
   const context = useMemo(
@@ -157,9 +159,35 @@ export function CoachPage() {
         duration: task.duration,
         type: task.type,
         status: task.status
-      }))
+      })),
+      // Materials context: let the coach reference uploaded notes, PDFs and videos.
+      // Note contents are passed verbatim (truncated); PDFs/videos pass title + reference only.
+      materials: activeMaterials.slice(0, 20).map((material) => {
+        if (material.type === "note") {
+          return {
+            examId: material.examId,
+            type: material.type,
+            title: material.title,
+            content: (material.content ?? "").slice(0, 800)
+          };
+        }
+        if (material.type === "video") {
+          return {
+            examId: material.examId,
+            type: material.type,
+            title: material.title,
+            url: material.url
+          };
+        }
+        return {
+          examId: material.examId,
+          type: material.type,
+          title: material.title,
+          fileName: material.fileName
+        };
+      })
     }),
-    [activeExams, activeTasks, activeTopics, stats]
+    [activeExams, activeTasks, activeTopics, activeMaterials, stats]
   );
 
   async function submitMessage(event?: FormEvent<HTMLFormElement>): Promise<void> {
@@ -217,7 +245,13 @@ export function CoachPage() {
             <span>{activeTopics.length} Themen</span>
             <span>{openTasks.length} offen</span>
             <span>{stats.streak} Streak</span>
+            <span>{activeMaterials.length} Materialien</span>
           </div>
+          {activeMaterials.length > 0 ? (
+            <p className="mt-2 text-xs text-slate-400">
+              Der Coach sieht deine Notizen, PDF-Namen und Video-Titel als Kontext.
+            </p>
+          ) : null}
         </div>
       </aside>
 

@@ -28,9 +28,15 @@ Frontend → Supabase Edge Function "ai-coach" → GLM API
 
 - HTTP-429 wird in `aiService` erkannt und als prominentes Rate-Limit-Feedback in Coach, ExamDetail und StudyPlan angezeigt.
 
-## Offene Punkte
+## KI-Kontext aus Materialien
 
-- TODO section (not implemented yet): **KI-Kontext aus Materialien** — Coach kennt hochgeladene PDFs/Notizen noch nicht. Das ist eine der nächsten Prioritäten.
+- Der Coach-Chat (`coachChat`-Aktion) erhält die hochgeladenen Lernmaterialien als Kontext:
+  - **Notizen**: Titel und Inhalt (auf 800 Zeichen gekürzt) werden vollständig übergeben.
+  - **PDFs**: Titel und Dateiname werden als Referenz übergeben (keine Textextraktion).
+  - **Videos**: Titel und URL werden als Referenz übergeben.
+- Die Materialien sind Teil des generischen `context`-Objekts, das in der Edge Function in den Prompt eingebettet wird (gesliced auf 6000 Zeichen).
+- Die Kontext-Sidebar im Coach zeigt die Anzahl der erkannten Materialien an.
+- Echte PDF-Textextraktion bleibt zurückgestellt; die aktuelle Umsetzung reicht aus, damit der Coach Notizen einbeziehen und auf PDFs/Videos verweisen kann.
 
 ## Edge Function deployen
 

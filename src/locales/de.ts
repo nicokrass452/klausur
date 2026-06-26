@@ -43,6 +43,12 @@ export const de = {
   "settings.pendingWrites": "Vorgemerkte Offline-Änderungen",
   "settings.offline": "Offline: Änderungen werden lokal vorgemerkt und später synchronisiert.",
 
+  // PWA install prompt
+  "install.title": "App installieren",
+  "install.body": "Installiere den Klausurplaner für schnelleren Zugriff und Offline-Nutzung — direkt vom Homescreen.",
+  "install.action": "Installieren",
+  "install.dismiss": "Später",
+
   // Sync status
   "sync.off": "Sync aus",
   "sync.offline": "Offline",
