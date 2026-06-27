@@ -1,6 +1,11 @@
+import { t } from "../lib/i18n";
+import { useAppStore } from "../store/useAppStore";
+
 export function AppLoader() {
+  const language = useAppStore((state) => state.settings.language);
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="status" aria-live="polite" aria-label={t("app.loading", language)}>
+      <span className="sr-only">{t("app.loading", language)}</span>
       <section className="surface-card p-6">
         <div className="h-4 w-28 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" />
         <div className="mt-4 h-10 w-2/3 animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800" />
