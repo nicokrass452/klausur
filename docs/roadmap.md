@@ -1,9 +1,11 @@
-# Roadmap & Offene Punkte
+﻿# Roadmap & Offene Punkte
 
 Diese Liste beschreibt, was für ein **produktionsreifes Produkt jenseits des MVP** noch fehlt oder verbessert werden muss.
 
 ## Abgeschlossen in diesem Durchlauf
 
+- Adaptive Lernplanung: Lernplan-Generator priorisiert Themen nach verpassten/ueberfaelligen Aufgaben, Schwierigkeit, Wissensstand, Abschlussstatus und Klausurtermin
+- Lerngruppen / geteilte Plaene: lokale Lerngruppen mit Einladungscode, Mitgliedern, geteilten Klausuren, kopierbarer Plan-Zusammenfassung und Supabase-Snapshot-Sync
 - KI-Kontext aus Materialien: Coach-Chat erhält Notizen (Inhalt), PDFs (Titel/Dateiname) und Videos (Titel/URL) als Kontext
 - Geführter PWA Install-Prompt-Flow: dismissible Install-Banner, mobil sichtbar, mit `appinstalled`-Behandlung
 - Überspringbares Tutorial, Sync-Retry in der Hauptnavigation, automatische Neuverteilung verpasster Aufgaben
@@ -49,10 +51,10 @@ Diese Liste beschreibt, was für ein **produktionsreifes Produkt jenseits des MV
 | Status | Thema | Beschreibung |
 |--------|-------|-------------|
 | ✅ | Verpasste Aufgaben | Automatische Neuverteilung verpasster offener Aufgaben beim App-Start (sofern online und nicht im Offline-Lesemodus). |
-| ⬜ | Adaptive Lernplanung | Keine echte Schwachstellenanalyse oder dynamische Priorisierung aus Nutzungsdaten. |
+| ✅ | Adaptive Lernplanung | Schwachstellenanalyse und dynamische Priorisierung aus Aufgabenstatus, Themen, Schwierigkeit, Wissensstand und Klausurtermin implementiert. |
 | ✅ | Analytics | CSV-Export der Lernzeiten/XP sowie 7/14/30-Tage-XP-Trends in Analytics verfügbar. |
 | ✅ | iCal Export | ICS-Export für einzelne Klausuren und alle aktiven Klausuren in `Exams` und `ExamDetail` verfügbar. |
-| ⬜ | Lerngruppen | Kein Teilen von Plänen, keine gemeinsamen Klausuren. |
+| ✅ | Lerngruppen | Lokale Lerngruppen mit Einladungscode, Mitgliedern, geteilten Klausuren, kopierbarer Plan-Zusammenfassung und Cloud-Snapshot-Sync. |
 
 ### KI
 

@@ -1,7 +1,7 @@
 import type { Session, User } from "@supabase/supabase-js";
 import { formatSupabaseError } from "../lib/supabaseErrors";
 import { getAuthRedirectUrl, supabase } from "../lib/supabase";
-import type { AppSnapshot, Exam, FocusSession, StudyMaterial, StudyTask, Topic, UserBadge, UserProfile, UserStats } from "../types";
+import type { AppSnapshot, Exam, FocusSession, LearningGroup, StudyMaterial, StudyTask, Topic, UserBadge, UserProfile, UserStats } from "../types";
 
 interface CloudBundle {
   user: UserProfile | null;
@@ -9,6 +9,7 @@ interface CloudBundle {
   topics: Topic[];
   studyTasks: StudyTask[];
   materials: StudyMaterial[];
+  learningGroups: LearningGroup[];
   stats: UserStats | null;
   focusSessions: FocusSession[];
   badges: UserBadge[];
@@ -107,6 +108,20 @@ function mapMaterialToRow(material: StudyMaterial, userId: string) {
   };
 }
 
+function mapLearningGroupToRow(group: LearningGroup, userId: string) {
+  return {
+    id: group.id,
+    user_id: userId,
+    name: group.name,
+    invite_code: group.inviteCode,
+    member_names: group.memberNames,
+    exam_ids: group.examIds,
+    created_at: group.createdAt,
+    updated_at: group.updatedAt,
+    deleted_at: group.deletedAt ?? null
+  };
+}
+
 function mapFocusSessionToRow(session: FocusSession, userId: string) {
   return {
     id: session.id,
@@ -190,6 +205,20 @@ function mapMaterialFromRow(row: Record<string, unknown>): StudyMaterial {
     content: (row.content as string | null) ?? undefined,
     url: (row.url as string | null) ?? undefined,
     fileName: (row.file_name as string | null) ?? undefined,
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+    deletedAt: row.deleted_at as string | null
+  };
+}
+
+function mapLearningGroupFromRow(row: Record<string, unknown>): LearningGroup {
+  return {
+    id: row.id as string,
+    userId: row.user_id as string,
+    name: row.name as string,
+    inviteCode: row.invite_code as string,
+    memberNames: (row.member_names as string[] | null) ?? [],
+    examIds: (row.exam_ids as string[] | null) ?? [],
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
     deletedAt: row.deleted_at as string | null
@@ -374,18 +403,19 @@ export function resolveConflicts<T extends { id: string; updatedAt: string; dele
 
 export async function pullFromCloud(userId: string): Promise<CloudBundle> {
   const client = requireSupabase();
-  const [profiles, exams, topics, studyTasks, materials, stats, focusSessions, badges] = await Promise.all([
+  const [profiles, exams, topics, studyTasks, materials, learningGroups, stats, focusSessions, badges] = await Promise.all([
     client.from("profiles").select("*").eq("id", userId).maybeSingle(),
     client.from("exams").select("*").eq("user_id", userId),
     client.from("topics").select("*").eq("user_id", userId),
     client.from("study_tasks").select("*").eq("user_id", userId),
     client.from("study_materials").select("*").eq("user_id", userId),
+    client.from("learning_groups").select("*").eq("user_id", userId),
     client.from("user_stats").select("*").eq("user_id", userId).maybeSingle(),
     client.from("focus_sessions").select("*").eq("user_id", userId),
     client.from("badges").select("*").eq("user_id", userId)
   ]);
 
-  [profiles, exams, topics, studyTasks, materials, stats, focusSessions, badges].forEach((result) => {
+  [profiles, exams, topics, studyTasks, materials, learningGroups, stats, focusSessions, badges].forEach((result) => {
     if (result.error && !isMissingRowError(result.error)) {
       throwIfSupabaseError(result.error);
     }
@@ -408,6 +438,7 @@ export async function pullFromCloud(userId: string): Promise<CloudBundle> {
     topics: (topics.data ?? []).map((row) => mapTopicFromRow(row)),
     studyTasks: (studyTasks.data ?? []).map((row) => mapTaskFromRow(row)),
     materials: (materials.data ?? []).map((row) => mapMaterialFromRow(row)),
+    learningGroups: (learningGroups.data ?? []).map((row) => mapLearningGroupFromRow(row)),
     stats: stats.data
       ? {
           studyTime: stats.data.study_time,
@@ -449,6 +480,12 @@ export async function syncStudyTask(task: StudyTask, userId: string): Promise<vo
 export async function syncStudyMaterial(material: StudyMaterial, userId: string): Promise<void> {
   const client = requireSupabase();
   const { error } = await client.from("study_materials").upsert(mapMaterialToRow(material, userId), { onConflict: "id" });
+  throwIfSupabaseError(error);
+}
+
+export async function syncLearningGroup(group: LearningGroup, userId: string): Promise<void> {
+  const client = requireSupabase();
+  const { error } = await client.from("learning_groups").upsert(mapLearningGroupToRow(group, userId), { onConflict: "id" });
   throwIfSupabaseError(error);
 }
 
@@ -500,7 +537,8 @@ export async function pushToCloud(snapshot: AppSnapshot): Promise<void> {
     client.from("exams").upsert(snapshot.exams.map((entry) => mapExamToRow(entry, userId)), { onConflict: "id" }),
     client.from("topics").upsert(snapshot.topics.map((entry) => mapTopicToRow(entry, userId)), { onConflict: "id" }),
     client.from("study_tasks").upsert(snapshot.studyTasks.map((entry) => mapTaskToRow(entry, userId)), { onConflict: "id" }),
-    client.from("study_materials").upsert(snapshot.materials.map((entry) => mapMaterialToRow(entry, userId)), { onConflict: "id" })
+    client.from("study_materials").upsert(snapshot.materials.map((entry) => mapMaterialToRow(entry, userId)), { onConflict: "id" }),
+    client.from("learning_groups").upsert(snapshot.learningGroups.map((entry) => mapLearningGroupToRow(entry, userId)), { onConflict: "id" })
   ];
 
   const results = await Promise.all(operations);

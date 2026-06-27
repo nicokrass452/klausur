@@ -1,6 +1,6 @@
 import type { TranslationKey } from "./de";
 
-export const en: Record<TranslationKey, string> = {
+export const en: Partial<Record<TranslationKey, string>> = {
   // Navigation
   "nav.dashboard": "Dashboard",
   "nav.calendar": "Calendar",

@@ -4,7 +4,7 @@ import { useAppStore } from "./useAppStore";
 describe("useAppStore", () => {
   beforeEach(() => {
     // Clear the store before each test
-    useAppStore.setState({ exams: [], topics: [], materials: [], studyTasks: [], authMode: "signed-out" });
+    useAppStore.setState({ exams: [], topics: [], materials: [], learningGroups: [], studyTasks: [], authMode: "signed-out" });
   });
 
   it("should add a new exam and generate tasks and topics if not provided", () => {
@@ -117,5 +117,80 @@ describe("useAppStore", () => {
     expect(yesterdayTask!.date >= today).toBe(true);
     expect(todayTask?.date).toBe(today);
     expect(tomorrowTask?.date).toBe(tomorrow);
+  });
+
+  it("creates learning groups and toggles shared exams", () => {
+    const examId = "exam-share";
+    useAppStore.setState({
+      authMode: "signed-out",
+      exams: [{
+        id: examId,
+        subject: "History",
+        date: "2024-12-01",
+        time: "10:00",
+        room: "A1",
+        notes: "",
+        difficulty: 3,
+        knowledgeLevel: 2,
+        color: "#0f766e",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        deletedAt: null,
+        dailyMinutes: 30
+      }]
+    });
+
+    const groupId = useAppStore.getState().createLearningGroup({ name: "Abi Team", memberNames: ["Mila"], examIds: [examId] });
+    let group = useAppStore.getState().learningGroups.find((entry) => entry.id === groupId);
+
+    expect(group).toBeDefined();
+    expect(group?.examIds).toContain(examId);
+    expect(group?.memberNames).toContain("Mila");
+
+    useAppStore.getState().unshareExamFromGroup(groupId, examId);
+    group = useAppStore.getState().learningGroups.find((entry) => entry.id === groupId);
+    expect(group?.examIds).not.toContain(examId);
+
+    useAppStore.getState().shareExamWithGroup(groupId, examId);
+    group = useAppStore.getState().learningGroups.find((entry) => entry.id === groupId);
+    expect(group?.examIds).toContain(examId);
+  });
+
+  it("regenerates an adaptive plan while preserving completed tasks", () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const futureExamDate = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+    const examId = "exam-adaptive";
+    useAppStore.setState({
+      authMode: "signed-out",
+      exams: [{
+        id: examId,
+        subject: "Physics",
+        date: futureExamDate,
+        time: "10:00",
+        room: "A1",
+        notes: "",
+        difficulty: 4,
+        knowledgeLevel: 2,
+        color: "#0f766e",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        deletedAt: null,
+        dailyMinutes: 30
+      }],
+      topics: [
+        { id: "topic-hard", examId, name: "Optics", completed: false, difficulty: 5, estimatedMinutes: 30, updatedAt: new Date().toISOString(), deletedAt: null }
+      ],
+      studyTasks: [
+        { id: "task-done", examId, topicId: "topic-hard", date: today, task: "Done", duration: 30, type: "learn" as const, status: "done" as const, updatedAt: new Date().toISOString(), deletedAt: null },
+        { id: "task-open", examId, topicId: "topic-hard", date: today, task: "Open", duration: 30, type: "learn" as const, status: "open" as const, updatedAt: new Date().toISOString(), deletedAt: null }
+      ]
+    });
+
+    useAppStore.getState().regenerateAdaptiveStudyPlan(examId);
+
+    const tasks = useAppStore.getState().studyTasks;
+    expect(tasks.find((task) => task.id === "task-done")?.status).toBe("done");
+    expect(tasks.find((task) => task.id === "task-open")).toBeUndefined();
+    expect(tasks.some((task) => task.id.startsWith(`${examId}-adaptive-`))).toBe(true);
   });
 });

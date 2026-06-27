@@ -58,6 +58,15 @@ export interface StudyMaterial extends SyncableEntity {
   createdAt: string;
 }
 
+export interface LearningGroup extends SyncableEntity {
+  id: string;
+  name: string;
+  inviteCode: string;
+  memberNames: string[];
+  examIds: string[];
+  createdAt: string;
+}
+
 export interface FocusSession extends SyncableEntity {
   id: string;
   startedAt: string;
@@ -148,6 +157,7 @@ export interface AppSnapshot {
   topics: Topic[];
   studyTasks: StudyTask[];
   materials: StudyMaterial[];
+  learningGroups: LearningGroup[];
   stats: UserStats;
   settings: AppSettings;
   user: User | null;
@@ -163,6 +173,7 @@ export type PendingWrite =
   | { id: string; userId: string; table: "topics"; op: "upsert"; payload: Topic; createdAt: string }
   | { id: string; userId: string; table: "study_tasks"; op: "upsert"; payload: StudyTask; createdAt: string }
   | { id: string; userId: string; table: "study_materials"; op: "upsert"; payload: StudyMaterial; createdAt: string }
+  | { id: string; userId: string; table: "learning_groups"; op: "upsert"; payload: LearningGroup; createdAt: string }
   | { id: string; userId: string; table: "user_stats"; op: "upsert"; payload: UserStats; createdAt: string }
   | { id: string; userId: string; table: "focus_sessions"; op: "upsert"; payload: FocusSession; createdAt: string };
 
@@ -171,6 +182,7 @@ export interface OfflineSnapshot {
   topics: Topic[];
   studyTasks: StudyTask[];
   materials: StudyMaterial[];
+  learningGroups: LearningGroup[];
   stats: UserStats;
   settings: AppSettings;
   user: User | null;

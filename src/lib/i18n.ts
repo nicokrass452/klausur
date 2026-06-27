@@ -3,7 +3,7 @@ import { en } from "../locales/en";
 
 export type Language = "de" | "en";
 
-const dictionaries: Record<Language, Record<TranslationKey, string>> = {
+const dictionaries: Record<Language, Partial<Record<TranslationKey, string>>> = {
   de,
   en
 };

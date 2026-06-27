@@ -264,7 +264,7 @@ export const de = {
   "tutorial.dashboard.summary": "Hier siehst du Countdown, heutige Aufgaben, Streak und Fortschritt auf einen Blick.",
   "tutorial.dashboard.d1": "Die große Karte zeigt deine nächste Klausur mit Countdown in Tagen.",
   "tutorial.dashboard.d2": "Der Lerncoach gibt dir täglich eine kurze Empfehlung basierend auf deinem Plan.",
-  "tutorial.dashboard.d3": "Unter „Heute lernen" findest du offene Aufgaben – abhaken bringt XP.",
+  "tutorial.dashboard.d3": "Unter Heute lernen findest du offene Aufgaben, abhaken bringt XP.",
   "tutorial.dashboard.d4": "Die Stat-Karten zeigen Streak, Fokuszeit und offene Aufgaben für heute.",
 
   "tutorial.exams.title": "Klausuren anlegen",
@@ -277,7 +277,7 @@ export const de = {
   "tutorial.studyPlan.title": "Lernplan mit Spaced Repetition",
   "tutorial.studyPlan.summary": "Aufgaben werden automatisch verteilt: 70 % lernen, 20 % wiederholen, 10 % Puffer.",
   "tutorial.studyPlan.d1": "Der Plan nutzt Intervalle an Tag 1, 2, 5, 10 und 18 für Wiederholungen.",
-  "tutorial.studyPlan.d2": "„Verpasste neu verteilen" schiebt offene Aufgaben auf kommende Tage.",
+  "tutorial.studyPlan.d2": "Verpasste neu verteilen schiebt offene Aufgaben auf kommende Tage.",
   "tutorial.studyPlan.d3": "KI-Plan optimieren, Quiz und Flashcards erzeugen Lernhilfen aus deinen Themen.",
   "tutorial.studyPlan.d4": "Erledigte Aufgaben geben XP – verpasste kannst du markieren.",
 
@@ -317,13 +317,13 @@ export const de = {
   "tutorial.gamification.summary": "Lernen wird belohnt – Aufgaben, Themen und Fokus-Sessions bringen XP.",
   "tutorial.gamification.d1": "XP-Badge oben rechts zeigt Level und gesammelte Erfahrungspunkte.",
   "tutorial.gamification.d2": "Streak zählt aufeinanderfolgende Lerntage.",
-  "tutorial.gamification.d3": "Badges wie „Fokusstart" oder „7er Streak" schaltest du durch Nutzung frei.",
+  "tutorial.gamification.d3": "Badges wie Fokusstart oder 7er Streak schaltest du durch Nutzung frei.",
   "tutorial.gamification.d4": "Toast-Benachrichtigungen erscheinen, wenn du XP erhältst.",
 
   "tutorial.finish.title": "Bereit zum Lernen!",
   "tutorial.finish.summary": "Du kennst jetzt alle Funktionen. Leg los – oder passe die Demo-Klausuren an.",
   "tutorial.finish.d1": "Die App startet mit Beispiel-Klausuren (Mathe & Biologie) – bearbeite oder lösche sie.",
-  "tutorial.finish.d2": "Erstelle deine erste eigene Klausur unter „Klausuren".",
+  "tutorial.finish.d2": "Erstelle deine erste eigene Klausur unter Klausuren.",
   "tutorial.finish.d3": "Viel Erfolg bei der nächsten Prüfung!",
 
   // ── Login ───────────────────────────────────────────────────

@@ -55,6 +55,18 @@ export const seedSnapshot: AppSnapshot = {
   exams,
   topics,
   studyTasks: exams.flatMap((exam) => generateStudyPlanForExam(exam, topics.filter((topic) => topic.examId === exam.id))),
+  learningGroups: [
+    {
+      id: "group-demo",
+      name: "Lerngruppe Mathe",
+      inviteCode: "MATHE-1234",
+      memberNames: ["Ich", "Lena"],
+      examIds: ["exam-mathe"],
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      deletedAt: null
+    }
+  ],
   materials: [
     {
       id: "mat-note-mathe",

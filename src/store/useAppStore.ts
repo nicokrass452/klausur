@@ -12,6 +12,7 @@ import {
   ensureProfile,
   syncExam,
   syncFocusSession,
+  syncLearningGroup,
   syncStudyMaterial,
   syncStudyTask,
   syncTopic,
@@ -26,12 +27,13 @@ import {
   saveCachedSnapshot,
   saveLastSyncedAt
 } from "../services/offlineStorageService";
-import { generateStudyPlanForExam, redistributeMissedStudyTasks } from "../services/studyPlanGenerator";
+import { generateAdaptiveStudyPlanForExam, generateStudyPlanForExam, redistributeMissedStudyTasks } from "../services/studyPlanGenerator";
 import type {
   AppSettings,
   AppSnapshot,
   Exam,
   FocusSession,
+  LearningGroup,
   OfflineSnapshot,
   PendingWrite,
   StudyMaterial,
@@ -88,7 +90,13 @@ interface AppStore extends AppSnapshot {
   updateMaterial: (id: string, patch: Partial<StudyMaterial>) => void;
   setTaskStatus: (id: string, status: StudyTask["status"]) => void;
   regenerateStudyPlan: (examId?: string) => void;
+  regenerateAdaptiveStudyPlan: (examId?: string) => void;
   redistributeMissed: () => void;
+  createLearningGroup: (payload: { name: string; memberNames?: string[]; examIds?: string[] }) => string;
+  updateLearningGroup: (id: string, patch: Partial<Pick<LearningGroup, "name" | "memberNames" | "examIds">>) => void;
+  removeLearningGroup: (id: string) => void;
+  shareExamWithGroup: (groupId: string, examId: string) => void;
+  unshareExamFromGroup: (groupId: string, examId: string) => void;
   addFocusSession: (minutes: number, completed?: boolean) => void;
   setTheme: (theme: AppSettings["theme"]) => void;
   setCalendarMode: (mode: AppSettings["calendarMode"]) => void;
@@ -116,6 +124,17 @@ function nowIso(): string {
 
 function makeId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}-${Date.now().toString(36)}`;
+}
+
+function makeInviteCode(name: string): string {
+  const prefix = name
+    .normalize("NFKD")
+    .replace(/[^\w\s-]/g, "")
+    .trim()
+    .slice(0, 5)
+    .replace(/\s+/g, "")
+    .toUpperCase() || "PLAN";
+  return `${prefix}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 }
 
 function touch<T extends { updatedAt: string }>(item: T): T {
@@ -168,6 +187,7 @@ function toOfflineSnapshot(snapshot: AppSnapshot): OfflineSnapshot {
     topics: snapshot.topics,
     studyTasks: snapshot.studyTasks,
     materials: snapshot.materials,
+    learningGroups: snapshot.learningGroups,
     stats: snapshot.stats,
     settings: snapshot.settings,
     user: snapshot.user,
@@ -206,6 +226,9 @@ async function applyPendingWrite(write: PendingWrite): Promise<void> {
       return;
     case "study_materials":
       await syncStudyMaterial(write.payload, write.userId);
+      return;
+    case "learning_groups":
+      await syncLearningGroup(write.payload, write.userId);
       return;
     case "focus_sessions":
       await syncFocusSession(write.payload, write.userId);
@@ -330,17 +353,22 @@ export const useAppStore = create<AppStore>()(
           const topics = state.topics.map((topic) => (topic.examId === id ? { ...topic, deletedAt, updatedAt: deletedAt } : topic));
           const studyTasks = state.studyTasks.map((task) => (task.examId === id ? { ...task, deletedAt, updatedAt: deletedAt } : task));
           const materials = state.materials.map((material) => (material.examId === id ? { ...material, deletedAt, updatedAt: deletedAt } : material));
+          const learningGroups = state.learningGroups.map((group) =>
+            group.examIds.includes(id) ? { ...group, examIds: group.examIds.filter((examId) => examId !== id), updatedAt: deletedAt } : group
+          );
           queued = [
             ...exams.filter((exam) => exam.id === id).map((exam) => ({ table: "exams" as const, op: "upsert" as const, payload: exam })),
             ...topics.filter((topic) => topic.examId === id).map((topic) => ({ table: "topics" as const, op: "upsert" as const, payload: topic })),
             ...studyTasks.filter((task) => task.examId === id).map((task) => ({ table: "study_tasks" as const, op: "upsert" as const, payload: task })),
-            ...materials.filter((material) => material.examId === id).map((material) => ({ table: "study_materials" as const, op: "upsert" as const, payload: material }))
+            ...materials.filter((material) => material.examId === id).map((material) => ({ table: "study_materials" as const, op: "upsert" as const, payload: material })),
+            ...learningGroups.filter((group) => group.examIds.length !== state.learningGroups.find((entry) => entry.id === group.id)?.examIds.length).map((group) => ({ table: "learning_groups" as const, op: "upsert" as const, payload: group }))
           ];
           return {
             exams,
             topics,
             studyTasks,
             materials,
+            learningGroups,
             syncStatus: state.isOnline ? "idle" : "queued"
           };
         });
@@ -470,6 +498,42 @@ export const useAppStore = create<AppStore>()(
         queued.forEach(enqueueWrite);
       },
 
+      regenerateAdaptiveStudyPlan: (examId) => {
+        requireMutation(get());
+        let queued: PendingWriteInput[] = [];
+        set((state) => {
+          const activeExams = state.exams
+            .filter((exam) => !exam.deletedAt)
+            .sort((left, right) => left.date.localeCompare(right.date));
+          const targetExam = examId ? activeExams.find((exam) => exam.id === examId) : activeExams[0];
+          if (!targetExam) return state;
+
+          const examTopics = state.topics.filter((topic) => topic.examId === targetExam.id && !topic.deletedAt);
+          const existingExamTasks = state.studyTasks.filter((task) => task.examId === targetExam.id && !task.deletedAt);
+          const { tasks: adaptiveTasks } = generateAdaptiveStudyPlanForExam(targetExam, examTopics, existingExamTasks);
+          const replacedTasks = state.studyTasks.filter(
+            (task) => task.examId === targetExam.id && !task.deletedAt && task.status !== "done"
+          );
+          const deletedAt = nowIso();
+          queued = [
+            ...replacedTasks.map((task) => ({
+              table: "study_tasks" as const,
+              op: "upsert" as const,
+              payload: { ...task, deletedAt, updatedAt: deletedAt }
+            })),
+            ...adaptiveTasks.map((task) => ({ table: "study_tasks" as const, op: "upsert" as const, payload: task }))
+          ];
+          return {
+            studyTasks: [
+              ...state.studyTasks.filter((task) => task.examId !== targetExam.id || task.deletedAt || task.status === "done"),
+              ...adaptiveTasks
+            ],
+            syncStatus: state.isOnline ? "idle" : "queued"
+          };
+        });
+        queued.forEach(enqueueWrite);
+      },
+
       redistributeMissed: () => {
         requireMutation(get());
         let queued: PendingWriteInput[] = [];
@@ -484,6 +548,95 @@ export const useAppStore = create<AppStore>()(
           return { studyTasks: updatedTasks, syncStatus: state.isOnline ? "idle" : "queued" };
         });
         queued.forEach(enqueueWrite);
+      },
+
+      createLearningGroup: (payload) => {
+        requireMutation(get());
+        let queued: PendingWriteInput | undefined;
+        let groupId = "";
+        set((state) => {
+          const ownerName = state.user?.fullName ?? state.user?.email ?? "Ich";
+          const memberNames = Array.from(new Set([ownerName, ...(payload.memberNames ?? [])].map((name) => name.trim()).filter(Boolean)));
+          const group: LearningGroup = {
+            id: makeId("group"),
+            name: payload.name.trim() || "Neue Lerngruppe",
+            inviteCode: makeInviteCode(payload.name),
+            memberNames,
+            examIds: Array.from(new Set(payload.examIds ?? [])),
+            createdAt: nowIso(),
+            updatedAt: nowIso(),
+            deletedAt: null,
+            userId: state.user?.id
+          };
+          groupId = group.id;
+          queued = { table: "learning_groups" as const, op: "upsert" as const, payload: group };
+          return { learningGroups: [...state.learningGroups, group], syncStatus: state.isOnline ? "idle" : "queued" };
+        });
+        if (queued) enqueueWrite(queued);
+        return groupId;
+      },
+
+      updateLearningGroup: (id, patch) => {
+        requireMutation(get());
+        let updated: LearningGroup | undefined;
+        set((state) => {
+          const learningGroups = state.learningGroups.map((group) => {
+            if (group.id !== id) return group;
+            updated = touch({
+              ...group,
+              ...patch,
+              name: patch.name?.trim() || group.name,
+              memberNames: patch.memberNames ? Array.from(new Set(patch.memberNames.map((name) => name.trim()).filter(Boolean))) : group.memberNames,
+              examIds: patch.examIds ? Array.from(new Set(patch.examIds)) : group.examIds
+            });
+            return updated;
+          });
+          return { learningGroups, syncStatus: state.isOnline ? "idle" : "queued" };
+        });
+        if (updated) enqueueWrite({ table: "learning_groups" as const, op: "upsert" as const, payload: updated });
+      },
+
+      removeLearningGroup: (id) => {
+        requireMutation(get());
+        let updated: LearningGroup | undefined;
+        set((state) => {
+          const deletedAt = nowIso();
+          const learningGroups = state.learningGroups.map((group) => {
+            if (group.id !== id) return group;
+            updated = { ...group, deletedAt, updatedAt: deletedAt };
+            return updated;
+          });
+          return { learningGroups, syncStatus: state.isOnline ? "idle" : "queued" };
+        });
+        if (updated) enqueueWrite({ table: "learning_groups" as const, op: "upsert" as const, payload: updated });
+      },
+
+      shareExamWithGroup: (groupId, examId) => {
+        requireMutation(get());
+        let updated: LearningGroup | undefined;
+        set((state) => {
+          const learningGroups = state.learningGroups.map((group) => {
+            if (group.id !== groupId || group.examIds.includes(examId)) return group;
+            updated = touch({ ...group, examIds: [...group.examIds, examId] });
+            return updated;
+          });
+          return { learningGroups, syncStatus: state.isOnline ? "idle" : "queued" };
+        });
+        if (updated) enqueueWrite({ table: "learning_groups" as const, op: "upsert" as const, payload: updated });
+      },
+
+      unshareExamFromGroup: (groupId, examId) => {
+        requireMutation(get());
+        let updated: LearningGroup | undefined;
+        set((state) => {
+          const learningGroups = state.learningGroups.map((group) => {
+            if (group.id !== groupId || !group.examIds.includes(examId)) return group;
+            updated = touch({ ...group, examIds: group.examIds.filter((entry) => entry !== examId) });
+            return updated;
+          });
+          return { learningGroups, syncStatus: state.isOnline ? "idle" : "queued" };
+        });
+        if (updated) enqueueWrite({ table: "learning_groups" as const, op: "upsert" as const, payload: updated });
       },
 
       addFocusSession: (minutes, completed) => {
@@ -596,7 +749,7 @@ export const useAppStore = create<AppStore>()(
         }
         await clearPendingWrites(state.user?.id);
         await clearOfflineGrant();
-        set({ user: null, isAuthenticated: false, authMode: 'signed-out', exams: [], topics: [], studyTasks: [], materials: [], stats: seedSnapshot.stats, lastSyncedAt: undefined, syncError: undefined, pendingWriteCount: 0 });
+        set({ user: null, isAuthenticated: false, authMode: 'signed-out', exams: [], topics: [], studyTasks: [], materials: [], learningGroups: [], stats: seedSnapshot.stats, lastSyncedAt: undefined, syncError: undefined, pendingWriteCount: 0 });
       },
 
       syncNow: async (retryCount = 0) => {
@@ -627,6 +780,7 @@ export const useAppStore = create<AppStore>()(
             topics: snapshot.topics,
             studyTasks: snapshot.studyTasks,
             materials: snapshot.materials,
+            learningGroups: snapshot.learningGroups,
             stats: nextStats,
             lastSyncedAt: new Date().toISOString(),
             syncStatus: "idle",
@@ -681,6 +835,7 @@ export const useAppStore = create<AppStore>()(
         topics: state.topics,
         studyTasks: state.studyTasks,
         materials: state.materials,
+        learningGroups: state.learningGroups,
         stats: state.stats,
         settings: state.settings
       }),
@@ -691,6 +846,7 @@ export const useAppStore = create<AppStore>()(
         state.hasHydrated = true;
         state.rewardToast = state.rewardToast;
         state.isOnline = state.isOnline;
+        state.learningGroups = state.learningGroups ?? [];
 
         // Never trust cached auth — always re-validate with Supabase on startup.
         state.user = null;
@@ -731,6 +887,7 @@ export const useAppStore = create<AppStore>()(
             state.topics = cloudSnapshot.topics;
             state.studyTasks = cloudSnapshot.studyTasks;
             state.materials = cloudSnapshot.materials;
+            state.learningGroups = cloudSnapshot.learningGroups;
             state.stats = withBadges(cloudSnapshot.exams, cloudSnapshot.studyTasks, cloudSnapshot.stats ?? seedSnapshot.stats);
             state.authReady = true;
             return;
@@ -761,6 +918,7 @@ export const useAppStore = create<AppStore>()(
                 state.topics = s.topics;
                 state.studyTasks = s.studyTasks;
                 state.materials = s.materials;
+                state.learningGroups = s.learningGroups ?? [];
                 state.stats = s.stats;
                 state.settings = s.settings;
               }

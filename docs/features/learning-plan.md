@@ -1,4 +1,4 @@
-# Lernplan & Klausurverwaltung
+﻿# Lernplan & Klausurverwaltung
 
 ## Klausuren
 
@@ -29,6 +29,12 @@ Wiederholungsintervalle: Tag 1, 2, 5, 10, 18
 - Verpasste Aufgaben werden beim App-Start automatisch neu verteilt, sofern online und nicht im Offline-Lesemodus.
 - Manuelle Neuverteilung ist ebenfalls möglich.
 
+### Adaptive Lernplanung
+
+- Der adaptive Generator bewertet Themen nach Schwierigkeit, Wissensstand, Abschlussstatus, verpassten Aufgaben, ueberfaelligen offenen Aufgaben und Naehe zum Klausurtermin.
+- `StudyPlan` zeigt die staerksten Schwachstellen als Score-Karten an.
+- "Adaptiv neu planen" ersetzt offene/nicht erledigte Aufgaben einer Klausur durch einen neuen Plan und erhaelt bereits abgeschlossene Aufgaben als Lernhistorie.
+
 ## Lernmaterialien pro Klausur
 
 - Notizen, Links, PDFs pro Klausur
@@ -38,7 +44,13 @@ Wiederholungsintervalle: Tag 1, 2, 5, 10, 18
 
 - ICS-Export für einzelne Klausuren und alle aktiven Klausuren in `Exams` und `ExamDetail` verfügbar.
 
+## Lerngruppen / geteilte Plaene
+
+- Nutzer koennen lokale Lerngruppen mit Name, Einladungscode und Mitgliedern anlegen.
+- Klausuren lassen sich pro Gruppe ein- und aushaengen.
+- Die Gruppenkarte kann eine Plan-Zusammenfassung mit Code, Mitgliedern und Aufgabenstatus in die Zwischenablage kopieren.
+- Lerngruppen sind Teil des lokalen Snapshots und werden ueber `learning_groups` mit Supabase synchronisiert.
+
 ## Offene Punkte
 
-- TODO section (not implemented yet): Lernplan ist nicht adaptiv — keine echte Schwachstellenanalyse oder dynamische Priorisierung aus Nutzungsdaten.
-- TODO section (not implemented yet): Lerngruppen — kein Teilen von Plänen, keine gemeinsamen Klausuren.
+- Realtime-/Mehrbenutzerbeitritt fuer Lerngruppen bleibt ein spaeterer Ausbau.

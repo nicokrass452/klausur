@@ -435,6 +435,7 @@ function toOfflineSnapshot(state: unknown): unknown {
     topics: unknown[];
     studyTasks: unknown[];
     materials: unknown[];
+    learningGroups: unknown[];
     stats: unknown;
     settings: unknown;
   };
@@ -444,6 +445,7 @@ function toOfflineSnapshot(state: unknown): unknown {
     topics: s.topics || [],
     studyTasks: s.studyTasks || [],
     materials: s.materials || [],
+    learningGroups: s.learningGroups || [],
     stats: s.stats || {},
     settings: s.settings || {}
   };
