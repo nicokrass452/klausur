@@ -91,15 +91,64 @@ Diese Liste beschreibt, was für ein **produktionsreifes Produkt jenseits des MV
 
 ## Nächste Prioritäten
 
-1. ~~Lerngruppen / geteilte Pläne~~ (abgeschlossen)
-2. ~~Vollständige i18n (EN) und Accessibility-Audit~~ (abgeschlossen)
-3. Realtime / inkrementeller Sync
-4. ~~Adaptive Lernplanung~~ (abgeschlossen)
-5. Echte PDF-Textextraktion für KI-Kontext
+Die verbleibenden Infrastruktur-Themen wie Realtime-Sync, echter Mehrbenutzerbetrieb und vollständige PDF-Textextraktion sind wichtig, aber sie sind große Umbauten mit vergleichsweise wenig sofort sichtbarer QoL-Verbesserung. Für die nächste Produktphase liegt der Fokus deshalb stärker auf KI-Funktionen, die direkt im Lernalltag spürbar sind.
+
+1. KI-Chat als zentrale Lernoberfläche ausbauen
+2. Chat-Historie mit Fach-/Klausur-Foldern, Suche und wiederverwendbarem Kontext
+3. KI stärker in Dashboard, ExamDetail, StudyPlan, Materialien und Analytics integrieren
+4. KI-generierte Mermaid-Diagramme für Lerninhalte, Concept Maps, Abläufe und Zeitlinien
+5. KI-generierte Charts für Lernfortschritt, Workload, Themenbeherrschung und Exam-Readiness
+6. File-aware AI: bessere Auswertung von Notizen, PDFs und Materialien
+7. Realtime / inkrementeller Sync
+8. Echte PDF-Textextraktion für KI-Kontext
+
+## KI-Roadmap
+
+### Stärkerer Chat
+
+- Chat kennt aktuelle Klausuren, Themen, Lernplan, verpasste Aufgaben, Materialien, Fortschritt und Spracheinstellung.
+- Chat kann zwischen Coach, Study Mode, Quiz, Flashcards, Plan-Optimierung und Erklären wechseln.
+- Antworten sollen stärker handlungsorientiert sein: nicht nur erklären, sondern nächste Lernschritte vorschlagen.
+
+### Chat-Historie & Folder-Management
+
+- Chats werden dauerhaft gespeichert und können nach Fach, Klausur, Lerngruppe oder freiem Ordner organisiert werden.
+- Jede Klausur kann eigene Chat-Threads haben, z. B. "Fragen", "Quiz", "Zusammenfassungen", "Fehleranalyse" oder "Lernplan".
+- Chat-Verläufe sollen durchsuchbar, umbenennbar, archivierbar und löschbar sein.
+- Threads behalten ihren Kontext: verknüpfte Klausur, relevante Themen, Materialien, generierte Diagramme, Charts, Quizfragen und Flashcards.
+- Nutzer können alte Antworten erneut verwenden, in Materialien speichern oder in neue Aufgaben/Themen umwandeln.
+- Später: automatische Vorschläge zum Einsortieren alter Chats in passende Fächer/Klausuren.
+
+### KI-Aktionen
+
+- KI darf strukturierte Änderungen vorschlagen, die erst nach Bestätigung angewendet werden.
+- Mögliche Aktionen: Themen erstellen, Aufgaben verschieben, Lernplan anpassen, Quiz erzeugen, Flashcards erzeugen, schwache Themen markieren.
+- Jede Aktion muss nachvollziehbar, rückfragbar und abbrechbar bleiben.
+
+### Diagramme mit Mermaid
+
+- KI kann Mermaid-Diagramme aus Themen, Notizen oder Chat-Antworten erzeugen.
+- Geeignete Formate: Flowcharts, Mindmaps, Concept Maps, Timelines und einfache Abhängigkeitsgraphen.
+- Frontend rendert Diagramme direkt im Chat und optional im ExamDetail-Kontext.
+- Später: Diagramm-Knoten in Topics, Flashcards oder Quizfragen umwandeln.
+
+### Charts & Visualisierungen
+
+- Zuerst app-native Charts für Lernfortschritt, XP-Verlauf, Workload, erledigte/verpasste Aufgaben und Exam-Readiness.
+- Danach KI-generierte Chart-Spezifikationen, die das Frontend sicher rendert.
+- Matplotlib/Python-ähnliche Chart-Erzeugung bleibt eine spätere Ausbaustufe, weil dafür Sandbox, Limits und sichere Dateiverarbeitung nötig sind.
+- Ziel ist nicht ein allgemeiner Code-Interpreter, sondern verständliche Lern- und Fortschrittsvisualisierungen.
+
+### File-aware AI
+
+- Materialien stärker in den KI-Kontext einbeziehen.
+- Notizen direkt analysieren, PDFs zunächst über Metadaten und später über echte Textextraktion.
+- Aus Materialien automatisch Zusammenfassungen, Themenlisten, Quizfragen, Flashcards und Diagramme erzeugen.
 
 ## Explizit zurückgestellt
 
 - Echte Mehrbenutzer-Lerngruppen (Realtime-/Mehrbenutzerbeitritt, Invites)
-- Echte PDF-Textextraktion für KI-Kontext (Metadaten + Notizinhalt sind bereits verfügbar)
 - Realtime inkrementeller Sync (architektureller Umbau)
+- Allgemeiner Python-/Matplotlib-Code-Interpreter ohne klaren Lernbezug
+- Vollständiger Web-/Deep-Research-Agent
 - Multi-Device Session Management
