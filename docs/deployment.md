@@ -11,7 +11,7 @@ npm run preview
 
 ## CI/CD
 
-- TODO section (not implemented yet): CI/CD Pipeline (GitHub Actions) ist eingerichtet mit Test und Build.
+- CI/CD Pipeline (GitHub Actions) ist eingerichtet mit Test und Build.
 - Production-Builds und Secrets sind in der GitHub Actions CI dokumentiert und eingepflegt.
 
 ## Edge Functions deployen

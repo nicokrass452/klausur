@@ -2,7 +2,7 @@
 
 Klausurplaner ist eine mobile-first Progressive Web App für Schülerinnen und Schüler. Die App organisiert Klausuren, generiert Lernpläne, trackt Fortschritt und kombiniert Fokusmodus, Analytics, Gamification und einen KI-Coach.
 
-Die App ist **über das MVP hinaus gewachsen**: Supabase-Auth, Cloud-Sync, Gast-Vorschau, geführtes Onboarding, Unit-Tests, Web-Push, Datei-Upload, Analytics-Export, iCal-Export, KI-Rate-Limit-Feedback und ein i18n-Grundgerüst sind implementiert. Für ein produktionsreifes Produkt bleiben noch größere Features wie Lerngruppen, vollständige i18n, KI-Kontext aus Materialien und Realtime-Sync.
+Die App ist **über das MVP hinaus gewachsen**: Supabase-Auth, Cloud-Sync, Gast-Vorschau, geführtes Onboarding, Unit-Tests, Web-Push, Datei-Upload, Analytics-Export, iCal-Export, KI-Rate-Limit-Feedback, KI-Kontext aus Materialien, Lerngruppen und vollständige i18n (EN) sind implementiert. Für ein produktionsreifes Produkt bleiben noch größere Features wie echter Realtime-Sync, Mehrbenutzer-Lerngruppen in Echtzeit und vollständige PDF-Textextraktion.
 
 ## Stack
 

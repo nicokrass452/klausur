@@ -17,5 +17,5 @@
 
 ## Offene Punkte
 
-- TODO section (not implemented yet): **Realtime inkrementeller Sync** — architektureller Umbau von Snapshot-Sync zu echtzeitbasiertem, inkrementellem Sync.
-- TODO section (not implemented yet): **Seed-Daten für Gäste** — Kalender-Vorschau nutzt Demo-Daten; keine echte anonyme Cloud-Vorschau.
+- **Realtime inkrementeller Sync** — architektureller Umbau von Snapshot-Sync zu echtzeitbasiertem, inkrementellem Sync.
+- **Seed-Daten für Gäste** — Kalender-Vorschau nutzt Demo-Daten; keine echte anonyme Cloud-Vorschau.
