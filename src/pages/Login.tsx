@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { CalendarDays, Chrome, Mail, UserPlus } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ROUTES } from "../lib/constants";
+import { t } from "../lib/i18n";
 import { getSupabaseConfigIssue, hasGoogleAuthEnv, hasSupabaseEnv } from "../lib/supabase";
 import { useAppStore } from "../store/useAppStore";
 
@@ -18,6 +19,7 @@ export function LoginPage({ mode = "login" }: LoginPageProps) {
   const isAuthenticated = useAppStore((state) => state.isAuthenticated);
   const login = useAppStore((state) => state.login);
   const signUp = useAppStore((state) => state.signUp);
+  const language = useAppStore((state) => state.settings.language);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -38,7 +40,7 @@ export function LoginPage({ mode = "login" }: LoginPageProps) {
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(15,118,110,0.14),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(249,115,22,0.1),_transparent_30%)]" />
       <div className="relative mx-auto grid min-h-screen max-w-6xl items-center gap-10 px-4 py-10 lg:grid-cols-[1.05fr_0.95fr] lg:px-6">
         <section className="hidden lg:block">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">Klausurplaner</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">{t("app.name", language)}</p>
           <h1 className="mt-4 max-w-lg font-display text-5xl leading-tight text-slate-950 dark:text-white">
             {isSignup ? "Account erstellen und loslegen." : "Willkommen zurück."}
           </h1>
@@ -53,18 +55,18 @@ export function LoginPage({ mode = "login" }: LoginPageProps) {
               to={ROUTES.signup}
               className={`segmented-control__item flex-1 text-center ${isSignup ? "segmented-control__item--active" : ""}`}
             >
-              Registrieren
+              {t("login.signupTitle", language)}
             </Link>
             <Link
               to={ROUTES.login}
               className={`segmented-control__item flex-1 text-center ${!isSignup ? "segmented-control__item--active" : ""}`}
             >
-              Anmelden
+              {t("login.title", language)}
             </Link>
           </div>
 
           <h2 className="mt-6 font-display text-3xl text-slate-950 dark:text-white">
-            {isSignup ? "Registrieren" : "Anmelden"}
+            {isSignup ? t("login.signupTitle", language) : t("login.title", language)}
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-500">
             {isSignup
@@ -85,7 +87,7 @@ export function LoginPage({ mode = "login" }: LoginPageProps) {
           ) : null}
 
           {authError ? (
-            <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">
+            <div role="status" aria-live="polite" className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">
               <p>{authError}</p>
               {showResend ? (
                 <button
@@ -114,7 +116,7 @@ export function LoginPage({ mode = "login" }: LoginPageProps) {
           ) : null}
 
           {authInfo ? (
-            <div className="mt-5 rounded-2xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-800 dark:border-teal-900/60 dark:bg-teal-950/30 dark:text-teal-300">
+            <div role="status" aria-live="polite" className="mt-5 rounded-2xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-800 dark:border-teal-900/60 dark:bg-teal-950/30 dark:text-teal-300">
               {authInfo}
             </div>
           ) : null}
@@ -137,8 +139,8 @@ export function LoginPage({ mode = "login" }: LoginPageProps) {
                 }}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3.5 text-sm font-semibold text-white disabled:opacity-50 dark:bg-teal-500 dark:text-slate-950"
               >
-                <Chrome size={16} />
-                Mit Google anmelden
+                <Chrome size={16} aria-hidden="true" />
+                {t("login.googleLogin", language)}
               </button>
             </div>
           ) : null}
@@ -169,9 +171,10 @@ export function LoginPage({ mode = "login" }: LoginPageProps) {
               }
             }}
           >
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
-              E-Mail
+            <label htmlFor="login-email" className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+              {t("login.email", language)}
               <input
+                id="login-email"
                 className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950"
                 type="email"
                 value={email}
@@ -180,9 +183,10 @@ export function LoginPage({ mode = "login" }: LoginPageProps) {
                 autoComplete="email"
               />
             </label>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
-              Passwort
+            <label htmlFor="login-password" className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+              {t("login.password", language)}
               <input
+                id="login-password"
                 className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950"
                 type="password"
                 value={password}
@@ -197,8 +201,8 @@ export function LoginPage({ mode = "login" }: LoginPageProps) {
               disabled={!hasSupabaseEnv || submitting}
               className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200"
             >
-              {isSignup ? <UserPlus size={16} /> : <Mail size={16} />}
-              {isSignup ? "Account erstellen" : "Mit E-Mail anmelden"}
+              {isSignup ? <UserPlus size={16} aria-hidden="true" /> : <Mail size={16} aria-hidden="true" />}
+              {isSignup ? t("login.signupButton", language) : "Mit E-Mail anmelden"}
             </button>
           </form>
 
@@ -207,7 +211,7 @@ export function LoginPage({ mode = "login" }: LoginPageProps) {
               to={ROUTES.calendar}
               className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 dark:border-slate-700 dark:text-slate-300"
             >
-              <CalendarDays size={16} />
+              <CalendarDays size={16} aria-hidden="true" />
               Nur Kalender ansehen
             </Link>
           </div>

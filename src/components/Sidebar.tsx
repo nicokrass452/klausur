@@ -2,24 +2,26 @@ import { LogIn } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { ROUTES } from "../lib/constants";
 import { AUTHENTICATED_NAV_ITEMS, GUEST_NAV_ITEMS } from "../lib/navigation";
+import { t } from "../lib/i18n";
 import { useAppStore } from "../store/useAppStore";
 
 export function Sidebar() {
   const isAuthenticated = useAppStore((state) => state.isAuthenticated);
+  const language = useAppStore((state) => state.settings.language);
   const navItems = isAuthenticated ? AUTHENTICATED_NAV_ITEMS : GUEST_NAV_ITEMS;
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200/70 bg-white/70 px-4 py-5 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/60 lg:flex">
       <div className="px-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">Klausurplaner</p>
-        <h1 className="mt-2 font-display text-2xl text-slate-950 dark:text-white">Lernen mit System</h1>
+        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">{t("app.name", language)}</p>
+        <h1 className="mt-2 font-display text-2xl text-slate-950 dark:text-white">{t("sidebar.tagline", language)}</h1>
         <p className="mt-1 text-sm text-slate-500">
-          {isAuthenticated ? "Cloud-Sync, KI-Coach und persönlicher Lernplan." : "Melde dich an, um alle Funktionen zu nutzen."}
+          {isAuthenticated ? t("sidebar.ctaBody", language) : t("sidebar.ctaBody2", language)}
         </p>
       </div>
 
-      <nav className="mt-8 space-y-1">
-        {navItems.map(({ to, label, icon: Icon }) => (
+      <nav className="mt-8 space-y-1" aria-label={t("app.name", language)}>
+        {navItems.map(({ to, labelKey, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
@@ -31,22 +33,22 @@ export function Sidebar() {
               }`
             }
           >
-            <Icon size={18} />
-            {label}
+            <Icon size={18} aria-hidden="true" />
+            {t(labelKey, language)}
           </NavLink>
         ))}
       </nav>
 
       {!isAuthenticated ? (
         <div className="mt-auto rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/80">
-          <p className="text-sm font-semibold text-slate-900 dark:text-white">Account erforderlich</p>
-          <p className="mt-1 text-sm text-slate-500">Lernplan, Coach und Statistiken sind nach dem Login verfügbar.</p>
+          <p className="text-sm font-semibold text-slate-900 dark:text-white">{t("sidebar.accountRequired", language)}</p>
+          <p className="mt-1 text-sm text-slate-500">{t("sidebar.accountRequiredDesc", language)}</p>
           <NavLink
             to={ROUTES.signup}
             className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white dark:bg-teal-500 dark:text-slate-950"
           >
-            <LogIn size={16} />
-            Registrieren
+            <LogIn size={16} aria-hidden="true" />
+            {t("nav.register", language)}
           </NavLink>
         </div>
       ) : null}
