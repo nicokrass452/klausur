@@ -92,7 +92,7 @@ Diese Liste beschreibt, was für ein **produktionsreifes Produkt jenseits des MV
 ## Nächste Prioritäten
 
 1. Lerngruppen / geteilte Pläne
-2. Vollständige i18n (EN) und Accessibility-Audit
+2. ~~Vollständige i18n (EN) und Accessibility-Audit~~ (abgeschlossen)
 3. Realtime / inkrementeller Sync
 4. Adaptive Lernplanung
 5. Echte PDF-Textextraktion für KI-Kontext

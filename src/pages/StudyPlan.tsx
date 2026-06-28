@@ -1,6 +1,7 @@
 import { Copy, Plus, Share2, Trash2, Users, WandSparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import { TaskCard } from "../components/TaskCard";
+import { t } from "../lib/i18n";
 import { generateFlashcardsFromTopicsResult, generateQuizFromTopicsResult, hasSupabaseEnv, optimizeStudyPlanWithAiResult } from "../services/aiService";
 import { buildAdaptivePlanInsights } from "../services/studyPlanGenerator";
 import { useAppStore } from "../store/useAppStore";
@@ -43,7 +44,8 @@ export function StudyPlanPage() {
   const unshareExamFromGroup = useAppStore((state) => state.unshareExamFromGroup);
   const removeLearningGroup = useAppStore((state) => state.removeLearningGroup);
   const isOfflineReadOnly = useAppStore((state) => state.authMode === "offline-readonly");
-  const [aiSummary, setAiSummary] = useState(hasSupabaseEnv ? "KI ueber Supabase Edge Function bereit." : "Mock-Fallback (kein Supabase-Setup).");
+  const language = useAppStore((state) => state.settings.language);
+  const [aiSummary, setAiSummary] = useState(hasSupabaseEnv ? t("studyPlan.aiReady", language) : t("common.mockFallback", language));
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | undefined>();
   const [aiRateLimited, setAiRateLimited] = useState(false);
@@ -63,11 +65,11 @@ export function StudyPlanPage() {
       <section className="rounded-[32px] border border-white/50 bg-white/80 p-6 shadow-panel dark:border-slate-800 dark:bg-slate-900/80">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Lernplan Generator</p>
-            <h3 className="mt-2 font-display text-2xl text-slate-950 dark:text-white">Automatische Verteilung mit Spaced Repetition</h3>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{t("studyPlan.title", language)}</p>
+            <h3 className="mt-2 font-display text-2xl text-slate-950 dark:text-white">{t("studyPlan.subtitle", language)}</h3>
           </div>
           <button disabled={isOfflineReadOnly} onClick={redistributeMissed} className="rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200">
-            Verpasste neu verteilen
+            {t("studyPlan.redistributeMissed", language)}
           </button>
         </div>
 
@@ -77,7 +79,7 @@ export function StudyPlanPage() {
             disabled={isOfflineReadOnly || exams.length === 0}
             className="inline-flex items-center gap-2 rounded-full border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-800 disabled:opacity-50 dark:border-teal-900 dark:bg-teal-950/40 dark:text-teal-200"
           >
-            <WandSparkles size={16} />
+            <WandSparkles size={16} aria-hidden="true" />
             Adaptiv neu planen
           </button>
           <button
@@ -96,8 +98,8 @@ export function StudyPlanPage() {
             disabled={aiLoading}
             className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white dark:bg-teal-500 dark:text-slate-950"
           >
-            <WandSparkles size={16} />
-            {aiLoading ? "KI laedt..." : "KI-Plan optimieren"}
+            <WandSparkles size={16} aria-hidden="true" />
+            {aiLoading ? t("common.aiLoading", language) : t("studyPlan.optimizeAi", language)}
           </button>
           <button
             onClick={async () => {
@@ -115,7 +117,7 @@ export function StudyPlanPage() {
             disabled={aiLoading}
             className="rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
           >
-            Quiz generieren
+            {t("studyPlan.generateQuiz", language)}
           </button>
           <button
             onClick={async () => {
@@ -133,13 +135,13 @@ export function StudyPlanPage() {
             disabled={aiLoading}
             className="rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
           >
-            Flashcards erzeugen
+            {t("studyPlan.generateFlashcards", language)}
           </button>
         </div>
-        <p className="mt-4 text-sm text-slate-500">{aiSummary}</p>
+        <p className="mt-4 text-sm text-slate-500" aria-live="polite">{aiSummary}</p>
         {aiRateLimited ? (
           <p className="mt-2 text-sm font-semibold text-rose-600 dark:text-rose-300" role="status" aria-live="polite">
-            KI-Kontingent erschoepft, bitte kurz warten.
+            {t("common.rateLimitedWait", language)}
           </p>
         ) : null}
         {aiError ? <p className="mt-2 text-sm text-amber-600 dark:text-amber-300">{aiError}</p> : null}
@@ -167,13 +169,13 @@ export function StudyPlanPage() {
             <input
               value={groupName}
               onChange={(event) => setGroupName(event.target.value)}
-              className="min-h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-teal-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+              className="min-h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-teal-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
               aria-label="Name der Lerngruppe"
             />
             <input
               value={memberName}
               onChange={(event) => setMemberName(event.target.value)}
-              className="min-h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-teal-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+              className="min-h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-teal-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
               aria-label="Mitglied"
               placeholder="Mitglied"
             />
@@ -186,7 +188,7 @@ export function StudyPlanPage() {
               }}
               className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-slate-950 px-4 text-sm font-semibold text-white disabled:opacity-50 dark:bg-teal-500 dark:text-slate-950"
             >
-              <Plus size={16} />
+              <Plus size={16} aria-hidden="true" />
               Gruppe
             </button>
           </div>
@@ -198,7 +200,7 @@ export function StudyPlanPage() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2 text-slate-500">
-                    <Users size={16} />
+                    <Users size={16} aria-hidden="true" />
                     <span className="text-sm font-semibold">{group.inviteCode}</span>
                   </div>
                   <h4 className="mt-2 font-display text-xl text-slate-950 dark:text-white">{group.name}</h4>
@@ -215,7 +217,7 @@ export function StudyPlanPage() {
                     aria-label="Gruppenplan kopieren"
                     title="Gruppenplan kopieren"
                   >
-                    <Copy size={16} />
+                    <Copy size={16} aria-hidden="true" />
                   </button>
                   <button
                     type="button"
@@ -225,7 +227,7 @@ export function StudyPlanPage() {
                     aria-label="Lerngruppe entfernen"
                     title="Lerngruppe entfernen"
                   >
-                    <Trash2 size={16} />
+                    <Trash2 size={16} aria-hidden="true" />
                   </button>
                 </div>
               </div>
@@ -238,6 +240,7 @@ export function StudyPlanPage() {
                       key={exam.id}
                       type="button"
                       disabled={isOfflineReadOnly}
+                      aria-pressed={shared}
                       onClick={() => (shared ? unshareExamFromGroup(group.id, exam.id) : shareExamWithGroup(group.id, exam.id))}
                       className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm font-semibold disabled:opacity-50 ${
                         shared
@@ -245,13 +248,15 @@ export function StudyPlanPage() {
                           : "border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"
                       }`}
                     >
-                      <Share2 size={14} />
+                      <Share2 size={14} aria-hidden="true" />
                       {exam.subject}
                     </button>
                   );
                 })}
               </div>
-              {copiedGroupId === group.id ? <p className="mt-3 text-sm font-semibold text-teal-700 dark:text-teal-300">Plan kopiert.</p> : null}
+              {copiedGroupId === group.id ? (
+                <p className="mt-3 text-sm font-semibold text-teal-700 dark:text-teal-300" role="status" aria-live="polite">Plan kopiert.</p>
+              ) : null}
             </article>
           ))}
         </div>
