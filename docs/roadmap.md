@@ -91,16 +91,15 @@ Diese Liste beschreibt, was für ein **produktionsreifes Produkt jenseits des MV
 
 ## Nächste Prioritäten
 
-1. Lerngruppen / geteilte Pläne
+1. ~~Lerngruppen / geteilte Pläne~~ (abgeschlossen)
 2. ~~Vollständige i18n (EN) und Accessibility-Audit~~ (abgeschlossen)
 3. Realtime / inkrementeller Sync
-4. Adaptive Lernplanung
+4. ~~Adaptive Lernplanung~~ (abgeschlossen)
 5. Echte PDF-Textextraktion für KI-Kontext
 
 ## Explizit zurückgestellt
 
-- Lerngruppen / geteilte Pläne (Schema, Invites, RLS, UI — mehrere Tage)
-- Vollständige i18n (nur Foundation; restliche Strings extrahieren)
+- Echte Mehrbenutzer-Lerngruppen (Realtime-/Mehrbenutzerbeitritt, Invites)
 - Echte PDF-Textextraktion für KI-Kontext (Metadaten + Notizinhalt sind bereits verfügbar)
 - Realtime inkrementeller Sync (architektureller Umbau)
 - Multi-Device Session Management

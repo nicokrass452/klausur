@@ -22,7 +22,7 @@
 
 ## Multi-Device Session Management
 
-- TODO section (not implemented yet): Kein explizites Geräte-Management oder "überall abmelden" außer globalem Sign-out.
+- Kein explizites Geräte-Management oder "überall abmelden" außer globalem Sign-out.
 - Session-Handling auf mehreren Geräten ist noch nicht implementiert.
 
 ## E-Mail-Bestätigung
