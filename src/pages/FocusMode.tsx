@@ -11,7 +11,9 @@ export function FocusModePage() {
 
   return (
     <div className="grid gap-6 xl:grid-cols-[1fr_0.85fr]">
-      <PomodoroTimer onSessionComplete={(minutes) => addFocusSession(minutes, true)} />
+      <div data-tour="focus-timer">
+        <PomodoroTimer onSessionComplete={(minutes) => addFocusSession(minutes, true)} />
+      </div>
       <section className="space-y-4">
         <StatCard
           label={t("focus.totalTime", language)}

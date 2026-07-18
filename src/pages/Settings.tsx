@@ -32,7 +32,7 @@ export function SettingsPage() {
 
   return (
     <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-      <section className="rounded-[32px] border border-white/50 bg-white/80 p-6 shadow-panel dark:border-slate-800 dark:bg-slate-900/80">
+      <section data-tour="settings-preferences" className="rounded-[32px] border border-white/50 bg-white/80 p-6 shadow-panel dark:border-slate-800 dark:bg-slate-900/80">
         <h3 className="font-display text-2xl text-slate-950 dark:text-white">{t("settings.theme", language)}</h3>
         <div className="mt-5">
           <SegmentedControl

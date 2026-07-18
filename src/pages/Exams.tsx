@@ -25,7 +25,7 @@ export function ExamsPage() {
 
   return (
     <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-      <section className="rounded-[32px] border border-white/50 bg-white/80 p-6 shadow-panel dark:border-slate-800 dark:bg-slate-900/80">
+      <section data-tour="exam-form" className="rounded-[32px] border border-white/50 bg-white/80 p-6 shadow-panel dark:border-slate-800 dark:bg-slate-900/80">
         <h3 className="font-display text-2xl text-slate-950 dark:text-white">{t("exam.create", language)}</h3>
         <form
           className="mt-6 grid gap-4 md:grid-cols-2"

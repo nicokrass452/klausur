@@ -62,7 +62,7 @@ export function StudyPlanPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[32px] border border-white/50 bg-white/80 p-6 shadow-panel dark:border-slate-800 dark:bg-slate-900/80">
+      <section data-tour="study-plan-actions" className="rounded-[32px] border border-white/50 bg-white/80 p-6 shadow-panel dark:border-slate-800 dark:bg-slate-900/80">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{t("studyPlan.title", language)}</p>

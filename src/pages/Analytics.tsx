@@ -25,7 +25,7 @@ export function AnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section data-tour="analytics-overview" className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <article className="rounded-[28px] border border-white/50 bg-white/80 p-5 shadow-panel dark:border-slate-800 dark:bg-slate-900/80">
           <p className="text-sm text-slate-500">{t("analytics.studyTime", language)}</p>
           <p className="mt-3 font-display text-3xl text-slate-950 dark:text-white">{formatMinutes(stats.studyTime)}</p>

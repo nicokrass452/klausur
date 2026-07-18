@@ -221,7 +221,7 @@ export function CoachPage() {
   }
 
   return (
-    <div className="grid min-h-[calc(100vh-8rem)] gap-6 xl:grid-cols-[18rem_1fr]">
+    <div data-tour="coach-workspace" className="grid min-h-[calc(100vh-8rem)] gap-6 xl:grid-cols-[18rem_1fr]">
       <aside className="space-y-5 rounded-[32px] border border-white/50 bg-white/80 p-5 shadow-panel dark:border-slate-800 dark:bg-slate-900/80">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{t("coach.title", language)}</p>

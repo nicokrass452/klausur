@@ -14,7 +14,7 @@ export function CalendarPage() {
 
   return (
     <section className="space-y-5">
-      <article className="surface-card flex flex-wrap items-center justify-between gap-4 p-5">
+      <article data-tour="calendar-controls" className="surface-card flex flex-wrap items-center justify-between gap-4 p-5">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{t("calendar.title", language)}</p>
           <h3 className="mt-1 font-display text-2xl text-slate-950 dark:text-white">
