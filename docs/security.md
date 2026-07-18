@@ -89,6 +89,7 @@ Manual cleanup test uses `net.http_post` directly or `select public.invoke_clean
 ```powershell
 supabase secrets set GLM_API_KEY="<neuer-key>"
 supabase secrets set DEEPSEEK_API_KEY="<neuer-key>"
+supabase secrets set GOOGLE_AI_API_KEY="<neuer-key>"
 supabase secrets set OFFLINE_SIGNING_KEY="<neuer-key>"
 supabase secrets set VAPID_PRIVATE_KEY="<neuer-key>"
 supabase secrets set VAPID_PUBLIC_KEY="<neuer-key>"
@@ -101,7 +102,7 @@ Bei Rotation müssen alle Push-Subscriptions neu abgeschlossen werden (User müs
 
 ## Secrets & API Keys
 
-- `GLM_API_KEY` und `DEEPSEEK_API_KEY` nie in `.env`, `.env.example` oder als `VITE_*` eintragen — nur als Supabase Edge Function Secrets.
+- `GLM_API_KEY`, `DEEPSEEK_API_KEY` und `GOOGLE_AI_API_KEY` nie in `.env`, `.env.example` oder als `VITE_*` eintragen — nur als Supabase Edge Function Secrets.
 - Server-only Werte gehören in Supabase Edge Function Secrets oder `.env.server`, nie in den Browser.
 
 ## Observability

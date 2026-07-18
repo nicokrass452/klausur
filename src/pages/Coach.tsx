@@ -2,7 +2,7 @@ import { Brain, CheckCircle2, ClipboardList, Eye, GraduationCap, Layers3, Loader
 import { FormEvent, useEffect, useMemo, useRef, useState, useId } from "react";
 import { useSearchParams } from "react-router-dom";
 import { t } from "../lib/i18n";
-import { hasSupabaseEnv, sendCoachChatResult, type CoachChatMessage, type CoachChatMode } from "../services/aiService";
+import { hasSupabaseEnv, sendCoachChatResult, type AiSource, type CoachChatMessage, type CoachChatMode } from "../services/aiService";
 import { useAppStore } from "../store/useAppStore";
 
 const modes: Array<{ id: CoachChatMode; label: string; icon: typeof Sparkles }> = [
@@ -13,9 +13,10 @@ const modes: Array<{ id: CoachChatMode; label: string; icon: typeof Sparkles }> 
   { id: "explain", label: "Erklären", icon: GraduationCap }
 ];
 
-function sourceLabel(source: "glm" | "deepseek" | "mock"): string {
+function sourceLabel(source: AiSource): string {
   if (source === "glm") return "GLM";
   if (source === "deepseek") return "DeepSeek";
+  if (source === "google") return "Google Gemini";
   return "Mock";
 }
 
@@ -134,7 +135,7 @@ export function CoachPage() {
       content: t("coach.greeting", language)
     }
   ]);
-  const [source, setSource] = useState<"glm" | "deepseek" | "mock" | undefined>();
+  const [source, setSource] = useState<AiSource | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [rateLimited, setRateLimited] = useState(false);
   const [loading, setLoading] = useState(false);

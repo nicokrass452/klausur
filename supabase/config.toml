@@ -1,0 +1,3 @@
+# Local Supabase CLI configuration. Remote project linking is stored separately
+# by `supabase link` and no credentials belong in this file.
+project_id = "klausur"

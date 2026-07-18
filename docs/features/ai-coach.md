@@ -1,4 +1,4 @@
-# KI-Coach (GLM + DeepSeek)
+# KI-Coach (GLM + DeepSeek + Google Gemini)
 
 ## Modi
 
@@ -10,12 +10,14 @@
 
 ## Architektur
 
-Die GLM- und DeepSeek-APIs werden nicht direkt aus dem Browser aufgerufen. Das Frontend ruft `supabase.functions.invoke("ai-coach")` auf; die Edge Function prüft das Supabase-Auth-JWT, validiert Eingaben und ruft erst GLM, dann DeepSeek auf. Erst wenn beide Provider fehlschlagen, nutzt das Frontend den lokalen Mock-Fallback.
+Die Provider-APIs werden nicht direkt aus dem Browser aufgerufen. Das Frontend ruft die Edge Function `ai-coach` auf; sie prüft das Supabase-Auth-JWT, validiert Eingaben und versucht nacheinander GLM, DeepSeek und Google Gemini. Erst wenn alle drei Provider fehlschlagen, wird der lokale Mock-Fallback verwendet.
 
 ```text
 Frontend → Supabase Edge Function "ai-coach" → GLM API
                                       ↓
                               DeepSeek API (Fallback)
+                                      ↓
+                         Google Gemini API (Fallback)
                                       ↓
                               Lokaler Mock-Fallback (Frontend)
 ```
@@ -47,6 +49,8 @@ supabase secrets set GLM_API_KEY="<dein-zhipu-api-key>"
 supabase secrets set GLM_MODEL="glm-4.7-flash"
 supabase secrets set DEEPSEEK_API_KEY="<dein-deepseek-api-key>"
 supabase secrets set DEEPSEEK_MODEL="deepseek-v4-flash"
+supabase secrets set GOOGLE_AI_API_KEY="<dein-google-ai-api-key>"
+supabase secrets set GOOGLE_AI_MODEL="gemini-2.5-flash"
 supabase functions deploy ai-coach
 ```
 
@@ -63,6 +67,8 @@ GLM_API_KEY=...
 GLM_MODEL=glm-4.7-flash
 DEEPSEEK_API_KEY=...
 DEEPSEEK_MODEL=deepseek-v4-flash
+GOOGLE_AI_API_KEY=...
+GOOGLE_AI_MODEL=gemini-2.5-flash
 ```
 
-**Wichtig:** `GLM_API_KEY` und `DEEPSEEK_API_KEY` nie in `.env`, `.env.example` oder als `VITE_*` eintragen.
+Alternativ wird auch der Secret-Name `GEMINI_API_KEY` akzeptiert. **Wichtig:** Provider-Keys nie in `.env`, `.env.example` oder als `VITE_*` eintragen.

@@ -2,14 +2,15 @@ import { Copy, Plus, Share2, Trash2, Users, WandSparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import { TaskCard } from "../components/TaskCard";
 import { t } from "../lib/i18n";
-import { generateFlashcardsFromTopicsResult, generateQuizFromTopicsResult, hasSupabaseEnv, optimizeStudyPlanWithAiResult } from "../services/aiService";
+import { generateFlashcardsFromTopicsResult, generateQuizFromTopicsResult, hasSupabaseEnv, optimizeStudyPlanWithAiResult, type AiSource } from "../services/aiService";
 import { buildAdaptivePlanInsights } from "../services/studyPlanGenerator";
 import { useAppStore } from "../store/useAppStore";
 import type { Exam, LearningGroup, StudyTask } from "../types";
 
-function aiSourceName(source: "glm" | "deepseek" | "mock"): string {
+function aiSourceName(source: AiSource): string {
   if (source === "glm") return "GLM";
   if (source === "deepseek") return "DeepSeek";
+  if (source === "google") return "Google Gemini";
   return "Mock";
 }
 

@@ -45,7 +45,7 @@ npm run preview
 | Architektur & Projektstruktur | [docs/architecture.md](docs/architecture.md) |
 | Lernplan & Klausurverwaltung | [docs/features/learning-plan.md](docs/features/learning-plan.md) |
 | Produktivität: Dashboard, Kalender, Fokus, Analytics, Gamification | [docs/features/productivity.md](docs/features/productivity.md) |
-| KI-Coach (GLM + DeepSeek) | [docs/features/ai-coach.md](docs/features/ai-coach.md) |
+| KI-Coach (GLM + DeepSeek + Google Gemini) | [docs/features/ai-coach.md](docs/features/ai-coach.md) |
 | Cloud-Sync & Offline-Handling | [docs/features/sync.md](docs/features/sync.md) |
 | Datei-Upload & Lernmaterialien | [docs/features/materials.md](docs/features/materials.md) |
 | PWA, Push-Benachrichtigungen, Service Worker | [docs/features/pwa.md](docs/features/pwa.md) |

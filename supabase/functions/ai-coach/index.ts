@@ -60,8 +60,10 @@ const DEFAULT_GLM_MODEL = "glm-4-flash";
 const DEFAULT_GLM_API_BASE = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
 const DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-flash";
 const DEFAULT_DEEPSEEK_API_BASE = "https://api.deepseek.com/chat/completions";
+const DEFAULT_GOOGLE_MODEL = "gemini-2.5-flash";
+const DEFAULT_GOOGLE_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
 
-type AiProvider = "glm" | "deepseek";
+type AiProvider = "glm" | "deepseek" | "google";
 
 interface DebugInfo {
   action?: string;
@@ -404,6 +406,98 @@ async function callDeepSeek(prompt: string, debug: DebugInfo): Promise<unknown> 
   throw lastError ?? new PublicError("DeepSeek API Anfrage fehlgeschlagen.", 500);
 }
 
+async function callGoogle(prompt: string, debug: DebugInfo): Promise<unknown> {
+  const apiKey = Deno.env.get("GOOGLE_AI_API_KEY") ?? Deno.env.get("GEMINI_API_KEY");
+  const models = getModelCandidates("GOOGLE_AI_MODELS", "GOOGLE_AI_MODEL", DEFAULT_GOOGLE_MODEL);
+  debug.provider = "google";
+  if (!apiKey) throw new PublicError("GOOGLE_AI_API_KEY fehlt in der Edge Function.", 500);
+
+  let lastError: PublicError | null = null;
+  for (const model of models) {
+    try {
+      return await callGoogleModel({
+        prompt,
+        apiKey,
+        apiBase: Deno.env.get("GOOGLE_AI_API_BASE") ?? DEFAULT_GOOGLE_API_BASE,
+        model,
+        debug
+      });
+    } catch (error) {
+      if (!(error instanceof PublicError)) throw error;
+      lastError = error;
+      if (error.status < 500) throw error;
+    }
+  }
+
+  throw lastError ?? new PublicError("Google Gemini API Anfrage fehlgeschlagen.", 500);
+}
+
+async function callGoogleModel(options: {
+  prompt: string;
+  apiKey: string;
+  apiBase: string;
+  model: string;
+  debug: DebugInfo;
+}): Promise<unknown> {
+  const { prompt, apiKey, apiBase, model, debug } = options;
+  debug.model = model;
+  debug.hasAiApiKey = true;
+  debug.aiHttpStatus = undefined;
+  debug.aiErrorText = undefined;
+
+  let response: Response;
+  try {
+    response = await fetch(`${apiBase.replace(/\/$/, "")}/models/${encodeURIComponent(model)}:generateContent`, {
+      method: "POST",
+      headers: {
+        "x-goog-api-key": apiKey,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: "Du bist ein praeziser Lerncoach. Erzeuge ausschliesslich valides JSON ohne Markdown." }]
+        },
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.4,
+          maxOutputTokens: 1600,
+          responseMimeType: "application/json"
+        }
+      })
+    });
+  } catch {
+    throw new PublicError(`Google Gemini API Netzwerkfehler fuer ${model}.`, 500);
+  }
+
+  debug.aiHttpStatus = response.status;
+  if (!response.ok) {
+    debug.aiErrorText = (await response.text()).slice(0, 300);
+    throw new PublicError(`Google Gemini API Anfrage fehlgeschlagen fuer ${model}.`, 500);
+  }
+
+  let data: unknown;
+  try {
+    data = await response.json();
+  } catch {
+    throw new PublicError(`Google Gemini API Antwort von ${model} war kein valides JSON.`, 500);
+  }
+
+  const parts = (data as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> })
+    ?.candidates?.[0]?.content?.parts;
+  const text = parts
+    ?.map((part) => typeof part.text === "string" ? part.text : "")
+    .join("")
+    .trim();
+  if (!text) throw new PublicError("Google Gemini API Antwort war leer.", 500);
+
+  try {
+    return JSON.parse(stripJsonCodeFence(text));
+  } catch {
+    debug.aiErrorText = text.slice(0, 300);
+    throw new PublicError(`Google Gemini Antwort von ${model} konnte nicht als JSON gelesen werden.`, 500);
+  }
+}
+
 async function callOpenAiCompatibleModel(options: {
   prompt: string;
   apiKey: string;
@@ -487,7 +581,7 @@ function validateAiResult(action: AiAction, result: unknown, providerLabel: stri
   return { title: data.title.slice(0, 120), body: data.body.slice(0, 600) };
 }
 
-async function callPrimaryWithDeepSeekFallback(action: AiAction, prompt: string, debug: DebugInfo): Promise<{ data: unknown; provider: AiProvider }> {
+async function callProviderChain(action: AiAction, prompt: string, debug: DebugInfo): Promise<{ data: unknown; provider: AiProvider }> {
   let primaryError: PublicError | null = null;
   try {
     const data = validateAiResult(action, await callGlm(prompt, debug), "GLM");
@@ -502,8 +596,19 @@ async function callPrimaryWithDeepSeekFallback(action: AiAction, prompt: string,
     return { data, provider: "deepseek" };
   } catch (error) {
     if (!(error instanceof PublicError) || error.status < 500) throw error;
-    const message = primaryError ? `${primaryError.message} DeepSeek-Fallback fehlgeschlagen: ${error.message}` : error.message;
-    throw new PublicError(message, 500);
+    const deepSeekError = error;
+    try {
+      const data = validateAiResult(action, await callGoogle(prompt, debug), "Google Gemini");
+      return { data, provider: "google" };
+    } catch (googleError) {
+      if (!(googleError instanceof PublicError) || googleError.status < 500) throw googleError;
+      const message = [
+        primaryError?.message,
+        `DeepSeek-Fallback fehlgeschlagen: ${deepSeekError.message}`,
+        `Google-Fallback fehlgeschlagen: ${googleError.message}`
+      ].filter(Boolean).join(" ");
+      throw new PublicError(message, 500);
+    }
   }
 }
 
@@ -560,7 +665,13 @@ function fallbackAiResult(action: AiAction, payload: Record<string, unknown>): u
 Deno.serve(async (req) => {
   const debug: DebugInfo = {
     model: getModelCandidates("GLM_MODELS", "GLM_MODEL", DEFAULT_GLM_MODEL).join(","),
-    hasAiApiKey: Boolean(Deno.env.get("GLM_API_KEY") ?? Deno.env.get("ZHIPU_API_KEY") ?? Deno.env.get("DEEPSEEK_API_KEY"))
+    hasAiApiKey: Boolean(
+      Deno.env.get("GLM_API_KEY") ??
+      Deno.env.get("ZHIPU_API_KEY") ??
+      Deno.env.get("DEEPSEEK_API_KEY") ??
+      Deno.env.get("GOOGLE_AI_API_KEY") ??
+      Deno.env.get("GEMINI_API_KEY")
+    )
   };
 
   try {
@@ -591,7 +702,7 @@ Deno.serve(async (req) => {
     const prompt = buildPrompt(body.action, body.payload);
     let result: { data: unknown; provider: AiProvider };
     try {
-      result = await callPrimaryWithDeepSeekFallback(body.action, prompt, debug);
+      result = await callProviderChain(body.action, prompt, debug);
     } catch (error) {
       if (error instanceof PublicError && error.status >= 500) {
         return aiFallbackResponse(body.action, body.payload, error.message, debug);

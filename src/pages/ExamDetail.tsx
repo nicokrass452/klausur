@@ -18,6 +18,7 @@ type AiPanel = "quiz" | "flashcards" | "coach";
 function aiSourceLabel(source: AiResult<unknown>["source"]): string {
   if (source === "glm") return "GLM API";
   if (source === "deepseek") return "DeepSeek API";
+  if (source === "google") return "Google Gemini API";
   return "Mock-Fallback";
 }
 

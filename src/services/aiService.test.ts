@@ -76,6 +76,23 @@ describe("aiService rate limiting", () => {
     expect(result.data).toHaveLength(1);
     expect(result.data[0].answer).toBe("4");
   });
+
+  it("reports Google as the source when the Edge Function uses Gemini", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        source: "google",
+        data: {
+          questions: [{ id: "q-google", prompt: "Was ist 3+3?", options: ["5", "6"], answer: "6" }]
+        }
+      })
+    }));
+
+    const result = await generateQuizFromTopicsResult(topics);
+    expect(result.source).toBe("google");
+    expect(result.data[0].answer).toBe("6");
+  });
 });
 
 describe("isRateLimitedError", () => {

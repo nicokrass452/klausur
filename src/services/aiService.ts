@@ -4,7 +4,7 @@ import { getSupabaseRequestHeaders, hasSupabaseEnv, supabase, supabaseAnonKey, s
 export { hasSupabaseEnv };
 
 type AiAction = "generateQuiz" | "generateFlashcards" | "optimizeStudyPlan" | "coachMessage" | "coachChat";
-type AiSource = "glm" | "deepseek" | "mock";
+export type AiSource = "glm" | "deepseek" | "google" | "mock";
 export type CoachChatMode = "coach" | "quiz" | "flashcards" | "plan" | "explain";
 export interface CoachChatMessage {
   role: "user" | "assistant";

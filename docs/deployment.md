@@ -25,6 +25,8 @@ supabase secrets set GLM_API_KEY="<dein-zhipu-api-key>"
 supabase secrets set GLM_MODEL="glm-4.7-flash"
 supabase secrets set DEEPSEEK_API_KEY="<dein-deepseek-api-key>"
 supabase secrets set DEEPSEEK_MODEL="deepseek-v4-flash"
+supabase secrets set GOOGLE_AI_API_KEY="<dein-google-ai-api-key>"
+supabase secrets set GOOGLE_AI_MODEL="gemini-2.5-flash"
 supabase functions deploy ai-coach
 ```
 
