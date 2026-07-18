@@ -14,6 +14,8 @@ import {
   syncFocusSession,
   syncLearningGroup,
   syncStudyMaterial,
+  syncStudyChat,
+  syncStudyMemory,
   syncStudyTask,
   syncTopic,
   syncUserStats,
@@ -37,6 +39,8 @@ import type {
   OfflineSnapshot,
   PendingWrite,
   StudyMaterial,
+  StudyChat,
+  StudyMemory,
   StudyTask,
   SyncStatus,
   Topic,
@@ -88,6 +92,11 @@ interface AppStore extends AppSnapshot {
   toggleTopic: (id: string) => void;
   addMaterial: (payload: Omit<StudyMaterial, "id" | "createdAt" | "updatedAt" | "deletedAt" | "userId">) => string;
   updateMaterial: (id: string, patch: Partial<StudyMaterial>) => void;
+  saveChat: (payload: { id?: string; examId: string; title: string; mode: StudyChat["mode"]; messages: StudyChat["messages"] }) => string;
+  removeChat: (id: string) => void;
+  addMemory: (payload: { examId: string; title: string; content: string }) => string;
+  updateMemory: (id: string, patch: Partial<Pick<StudyMemory, "title" | "content">>) => void;
+  removeMemory: (id: string) => void;
   setTaskStatus: (id: string, status: StudyTask["status"]) => void;
   regenerateStudyPlan: (examId?: string) => void;
   regenerateAdaptiveStudyPlan: (examId?: string) => void;
@@ -187,6 +196,8 @@ function toOfflineSnapshot(snapshot: AppSnapshot): OfflineSnapshot {
     topics: snapshot.topics,
     studyTasks: snapshot.studyTasks,
     materials: snapshot.materials,
+    chats: snapshot.chats,
+    memories: snapshot.memories,
     learningGroups: snapshot.learningGroups,
     stats: snapshot.stats,
     settings: snapshot.settings,
@@ -226,6 +237,12 @@ async function applyPendingWrite(write: PendingWrite): Promise<void> {
       return;
     case "study_materials":
       await syncStudyMaterial(write.payload, write.userId);
+      return;
+    case "study_chats":
+      await syncStudyChat(write.payload, write.userId);
+      return;
+    case "study_memories":
+      await syncStudyMemory(write.payload, write.userId);
       return;
     case "learning_groups":
       await syncLearningGroup(write.payload, write.userId);
@@ -353,6 +370,8 @@ export const useAppStore = create<AppStore>()(
           const topics = state.topics.map((topic) => (topic.examId === id ? { ...topic, deletedAt, updatedAt: deletedAt } : topic));
           const studyTasks = state.studyTasks.map((task) => (task.examId === id ? { ...task, deletedAt, updatedAt: deletedAt } : task));
           const materials = state.materials.map((material) => (material.examId === id ? { ...material, deletedAt, updatedAt: deletedAt } : material));
+          const chats = state.chats.map((chat) => (chat.examId === id ? { ...chat, deletedAt, updatedAt: deletedAt } : chat));
+          const memories = state.memories.map((memory) => (memory.examId === id ? { ...memory, deletedAt, updatedAt: deletedAt } : memory));
           const learningGroups = state.learningGroups.map((group) =>
             group.examIds.includes(id) ? { ...group, examIds: group.examIds.filter((examId) => examId !== id), updatedAt: deletedAt } : group
           );
@@ -361,6 +380,8 @@ export const useAppStore = create<AppStore>()(
             ...topics.filter((topic) => topic.examId === id).map((topic) => ({ table: "topics" as const, op: "upsert" as const, payload: topic })),
             ...studyTasks.filter((task) => task.examId === id).map((task) => ({ table: "study_tasks" as const, op: "upsert" as const, payload: task })),
             ...materials.filter((material) => material.examId === id).map((material) => ({ table: "study_materials" as const, op: "upsert" as const, payload: material })),
+            ...chats.filter((chat) => chat.examId === id).map((chat) => ({ table: "study_chats" as const, op: "upsert" as const, payload: chat })),
+            ...memories.filter((memory) => memory.examId === id).map((memory) => ({ table: "study_memories" as const, op: "upsert" as const, payload: memory })),
             ...learningGroups.filter((group) => group.examIds.length !== state.learningGroups.find((entry) => entry.id === group.id)?.examIds.length).map((group) => ({ table: "learning_groups" as const, op: "upsert" as const, payload: group }))
           ];
           return {
@@ -368,6 +389,8 @@ export const useAppStore = create<AppStore>()(
             topics,
             studyTasks,
             materials,
+            chats,
+            memories,
             learningGroups,
             syncStatus: state.isOnline ? "idle" : "queued"
           };
@@ -454,6 +477,87 @@ export const useAppStore = create<AppStore>()(
           return { materials, syncStatus: state.isOnline ? "idle" : "queued" };
         });
         if (updated) enqueueWrite({ table: "study_materials" as const, op: "upsert" as const, payload: updated });
+      },
+
+      saveChat: (payload) => {
+        requireMutation(get());
+        const chatId = payload.id ?? makeId("chat");
+        let queued: StudyChat | undefined;
+        set((state) => {
+          const existing = state.chats.find((chat) => chat.id === chatId);
+          const chat: StudyChat = {
+            id: chatId,
+            examId: payload.examId,
+            title: payload.title.trim() || "Neuer Chat",
+            mode: payload.mode,
+            messages: payload.messages,
+            createdAt: existing?.createdAt ?? nowIso(),
+            updatedAt: nowIso(),
+            deletedAt: null,
+            userId: state.user?.id
+          };
+          queued = chat;
+          return { chats: existing ? state.chats.map((entry) => entry.id === chatId ? chat : entry) : [...state.chats, chat] };
+        });
+        if (queued) enqueueWrite({ table: "study_chats", op: "upsert", payload: queued });
+        return chatId;
+      },
+
+      removeChat: (id) => {
+        requireMutation(get());
+        let queued: StudyChat | undefined;
+        set((state) => ({ chats: state.chats.map((chat) => {
+          if (chat.id !== id) return chat;
+          const deletedAt = nowIso();
+          queued = { ...chat, deletedAt, updatedAt: deletedAt };
+          return queued;
+        }) }));
+        if (queued) enqueueWrite({ table: "study_chats", op: "upsert", payload: queued });
+      },
+
+      addMemory: (payload) => {
+        requireMutation(get());
+        const memoryId = makeId("memory");
+        let queued: StudyMemory | undefined;
+        set((state) => {
+          const memory: StudyMemory = {
+            id: memoryId,
+            examId: payload.examId,
+            title: payload.title.trim() || "Notiz",
+            content: payload.content,
+            createdAt: nowIso(),
+            updatedAt: nowIso(),
+            deletedAt: null,
+            userId: state.user?.id
+          };
+          queued = memory;
+          return { memories: [...state.memories, memory] };
+        });
+        if (queued) enqueueWrite({ table: "study_memories", op: "upsert", payload: queued });
+        return memoryId;
+      },
+
+      updateMemory: (id, patch) => {
+        requireMutation(get());
+        let queued: StudyMemory | undefined;
+        set((state) => ({ memories: state.memories.map((memory) => {
+          if (memory.id !== id) return memory;
+          queued = touch({ ...memory, ...patch });
+          return queued;
+        }) }));
+        if (queued) enqueueWrite({ table: "study_memories", op: "upsert", payload: queued });
+      },
+
+      removeMemory: (id) => {
+        requireMutation(get());
+        let queued: StudyMemory | undefined;
+        set((state) => ({ memories: state.memories.map((memory) => {
+          if (memory.id !== id) return memory;
+          const deletedAt = nowIso();
+          queued = { ...memory, deletedAt, updatedAt: deletedAt };
+          return queued;
+        }) }));
+        if (queued) enqueueWrite({ table: "study_memories", op: "upsert", payload: queued });
       },
 
       setTaskStatus: (id, status) => {
@@ -749,7 +853,7 @@ export const useAppStore = create<AppStore>()(
         }
         await clearPendingWrites(state.user?.id);
         await clearOfflineGrant();
-        set({ user: null, isAuthenticated: false, authMode: 'signed-out', exams: [], topics: [], studyTasks: [], materials: [], learningGroups: [], stats: seedSnapshot.stats, lastSyncedAt: undefined, syncError: undefined, pendingWriteCount: 0 });
+        set({ user: null, isAuthenticated: false, authMode: 'signed-out', exams: [], topics: [], studyTasks: [], materials: [], chats: [], memories: [], learningGroups: [], stats: seedSnapshot.stats, lastSyncedAt: undefined, syncError: undefined, pendingWriteCount: 0 });
       },
 
       syncNow: async (retryCount = 0) => {
@@ -780,6 +884,8 @@ export const useAppStore = create<AppStore>()(
             topics: snapshot.topics,
             studyTasks: snapshot.studyTasks,
             materials: snapshot.materials,
+            chats: snapshot.chats,
+            memories: snapshot.memories,
             learningGroups: snapshot.learningGroups,
             stats: nextStats,
             lastSyncedAt: new Date().toISOString(),
@@ -835,6 +941,8 @@ export const useAppStore = create<AppStore>()(
         topics: state.topics,
         studyTasks: state.studyTasks,
         materials: state.materials,
+        chats: state.chats,
+        memories: state.memories,
         learningGroups: state.learningGroups,
         stats: state.stats,
         settings: state.settings
@@ -847,6 +955,8 @@ export const useAppStore = create<AppStore>()(
         state.rewardToast = state.rewardToast;
         state.isOnline = state.isOnline;
         state.learningGroups = state.learningGroups ?? [];
+        state.chats = state.chats ?? [];
+        state.memories = state.memories ?? [];
 
         // Never trust cached auth — always re-validate with Supabase on startup.
         state.user = null;
@@ -887,6 +997,8 @@ export const useAppStore = create<AppStore>()(
             state.topics = cloudSnapshot.topics;
             state.studyTasks = cloudSnapshot.studyTasks;
             state.materials = cloudSnapshot.materials;
+            state.chats = cloudSnapshot.chats;
+            state.memories = cloudSnapshot.memories;
             state.learningGroups = cloudSnapshot.learningGroups;
             state.stats = withBadges(cloudSnapshot.exams, cloudSnapshot.studyTasks, cloudSnapshot.stats ?? seedSnapshot.stats);
             state.authReady = true;

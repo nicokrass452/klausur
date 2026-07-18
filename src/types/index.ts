@@ -58,6 +58,28 @@ export interface StudyMaterial extends SyncableEntity {
   createdAt: string;
 }
 
+export interface StudyChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface StudyChat extends SyncableEntity {
+  id: string;
+  examId: string;
+  title: string;
+  mode: "coach" | "quiz" | "flashcards" | "plan" | "explain";
+  messages: StudyChatMessage[];
+  createdAt: string;
+}
+
+export interface StudyMemory extends SyncableEntity {
+  id: string;
+  examId: string;
+  title: string;
+  content: string;
+  createdAt: string;
+}
+
 export interface LearningGroup extends SyncableEntity {
   id: string;
   name: string;
@@ -157,6 +179,8 @@ export interface AppSnapshot {
   topics: Topic[];
   studyTasks: StudyTask[];
   materials: StudyMaterial[];
+  chats: StudyChat[];
+  memories: StudyMemory[];
   learningGroups: LearningGroup[];
   stats: UserStats;
   settings: AppSettings;
@@ -173,6 +197,8 @@ export type PendingWrite =
   | { id: string; userId: string; table: "topics"; op: "upsert"; payload: Topic; createdAt: string }
   | { id: string; userId: string; table: "study_tasks"; op: "upsert"; payload: StudyTask; createdAt: string }
   | { id: string; userId: string; table: "study_materials"; op: "upsert"; payload: StudyMaterial; createdAt: string }
+  | { id: string; userId: string; table: "study_chats"; op: "upsert"; payload: StudyChat; createdAt: string }
+  | { id: string; userId: string; table: "study_memories"; op: "upsert"; payload: StudyMemory; createdAt: string }
   | { id: string; userId: string; table: "learning_groups"; op: "upsert"; payload: LearningGroup; createdAt: string }
   | { id: string; userId: string; table: "user_stats"; op: "upsert"; payload: UserStats; createdAt: string }
   | { id: string; userId: string; table: "focus_sessions"; op: "upsert"; payload: FocusSession; createdAt: string };
@@ -182,6 +208,8 @@ export interface OfflineSnapshot {
   topics: Topic[];
   studyTasks: StudyTask[];
   materials: StudyMaterial[];
+  chats: StudyChat[];
+  memories: StudyMemory[];
   learningGroups: LearningGroup[];
   stats: UserStats;
   settings: AppSettings;

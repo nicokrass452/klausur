@@ -1,5 +1,6 @@
 import { Brain, CheckCircle2, ClipboardList, Eye, GraduationCap, Layers3, Loader2, Send, Sparkles } from "lucide-react";
-import { FormEvent, useMemo, useRef, useState, useId } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState, useId } from "react";
+import { useSearchParams } from "react-router-dom";
 import { t } from "../lib/i18n";
 import { hasSupabaseEnv, sendCoachChatResult, type CoachChatMessage, type CoachChatMode } from "../services/aiService";
 import { useAppStore } from "../store/useAppStore";
@@ -115,10 +116,19 @@ export function CoachPage() {
   const studyTasks = useAppStore((state) => state.studyTasks);
   const materials = useAppStore((state) => state.materials);
   const stats = useAppStore((state) => state.stats);
+  const chats = useAppStore((state) => state.chats);
+  const memories = useAppStore((state) => state.memories);
+  const saveChat = useAppStore((state) => state.saveChat);
   const language = useAppStore((state) => state.settings.language);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedChatId = searchParams.get("chat");
+  const requestedExamId = searchParams.get("exam");
+  const requestedChat = chats.find((chat) => chat.id === requestedChatId && !chat.deletedAt);
   const [mode, setMode] = useState<CoachChatMode>("coach");
+  const [chatId, setChatId] = useState<string | undefined>(requestedChat?.id);
+  const [selectedExamId, setSelectedExamId] = useState(requestedChat?.examId ?? requestedExamId ?? exams.find((exam) => !exam.deletedAt)?.id ?? "");
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<CoachChatMessage[]>([
+  const [messages, setMessages] = useState<CoachChatMessage[]>(requestedChat?.messages ?? [
     {
       role: "assistant",
       content: t("coach.greeting", language)
@@ -135,6 +145,18 @@ export function CoachPage() {
   const activeTasks = useMemo(() => studyTasks.filter((task) => !task.deletedAt), [studyTasks]);
   const activeMaterials = useMemo(() => materials.filter((material) => !material.deletedAt), [materials]);
   const openTasks = useMemo(() => activeTasks.filter((task) => task.status === "open"), [activeTasks]);
+  const activeMemories = useMemo(
+    () => memories.filter((memory) => !memory.deletedAt && memory.examId === selectedExamId),
+    [memories, selectedExamId]
+  );
+
+  useEffect(() => {
+    if (!requestedChat) return;
+    setChatId(requestedChat.id);
+    setSelectedExamId(requestedChat.examId);
+    setMode(requestedChat.mode);
+    setMessages(requestedChat.messages);
+  }, [requestedChatId]);
 
   const context = useMemo(
     () => ({
@@ -192,9 +214,13 @@ export function CoachPage() {
           title: material.title,
           fileName: material.fileName
         };
-      })
+      }),
+      memory: activeMemories.slice(0, 30).map((entry) => ({
+        title: entry.title,
+        content: entry.content
+      }))
     }),
-    [activeExams, activeTasks, activeTopics, activeMaterials, stats]
+    [activeExams, activeTasks, activeTopics, activeMaterials, activeMemories, stats]
   );
 
   async function submitMessage(event?: FormEvent<HTMLFormElement>): Promise<void> {
@@ -213,7 +239,20 @@ export function CoachPage() {
       setSource(result.source);
       setError(result.error);
       setRateLimited(result.rateLimited ?? false);
-      setMessages([...nextMessages, { role: "assistant", content: result.data.message }]);
+      const finalMessages = [...nextMessages, { role: "assistant" as const, content: result.data.message }];
+      setMessages(finalMessages);
+      if (selectedExamId) {
+        const firstQuestion = finalMessages.find((message) => message.role === "user")?.content ?? text;
+        const savedId = saveChat({
+          id: chatId,
+          examId: selectedExamId,
+          title: firstQuestion.length > 64 ? `${firstQuestion.slice(0, 61)}...` : firstQuestion,
+          mode,
+          messages: finalMessages
+        });
+        setChatId(savedId);
+        setSearchParams({ chat: savedId }, { replace: true });
+      }
     } finally {
       setLoading(false);
       window.setTimeout(() => inputRef.current?.focus(), 0);
@@ -227,6 +266,23 @@ export function CoachPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{t("coach.title", language)}</p>
           <h3 className="mt-2 font-display text-2xl text-slate-950 dark:text-white">{t("coach.chatTitle", language)}</h3>
         </div>
+
+        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200">
+          {language === "en" ? "Save chat in" : "Chat speichern unter"}
+          <select
+            value={selectedExamId}
+            onChange={(event) => {
+              setSelectedExamId(event.target.value);
+              setChatId(undefined);
+              setMessages([{ role: "assistant", content: t("coach.greeting", language) }]);
+              setSearchParams(event.target.value ? { exam: event.target.value } : {}, { replace: true });
+            }}
+            className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium dark:border-slate-700 dark:bg-slate-950"
+          >
+            <option value="">{language === "en" ? "Select an exam" : "Klausur auswählen"}</option>
+            {activeExams.map((exam) => <option key={exam.id} value={exam.id}>{exam.subject}</option>)}
+          </select>
+        </label>
 
         <div className="grid gap-2" role="group" aria-label={t("coach.title", language)}>
           {modes.map(({ id, label, icon: Icon }) => (
@@ -254,6 +310,7 @@ export function CoachPage() {
             <span>{openTasks.length} {t("common.open", language)}</span>
             <span>{stats.streak} {t("common.streak", language)}</span>
             <span>{activeMaterials.length} {t("coach.materials", language)}</span>
+            <span>{activeMemories.length} Memory</span>
           </div>
           {activeMaterials.length > 0 ? (
             <p className="mt-2 text-xs text-slate-400">
@@ -274,6 +331,8 @@ export function CoachPage() {
           <button
             onClick={() => {
               setMessages([{ role: "assistant", content: t("coach.greeting", language) }]);
+              setChatId(undefined);
+              setSearchParams(selectedExamId ? { exam: selectedExamId } : {}, { replace: true });
               setError(undefined);
               setSource(undefined);
             }}

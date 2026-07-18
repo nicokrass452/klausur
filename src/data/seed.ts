@@ -89,6 +89,8 @@ export const seedSnapshot: AppSnapshot = {
       deletedAt: null
     }
   ],
+  chats: [],
+  memories: [],
   stats: {
     studyTime: 165,
     streak: 3,

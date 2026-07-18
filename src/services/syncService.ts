@@ -1,7 +1,7 @@
 import type { Session, User } from "@supabase/supabase-js";
 import { formatSupabaseError } from "../lib/supabaseErrors";
 import { getAuthRedirectUrl, supabase } from "../lib/supabase";
-import type { AppSnapshot, Exam, FocusSession, LearningGroup, StudyMaterial, StudyTask, Topic, UserBadge, UserProfile, UserStats } from "../types";
+import type { AppSnapshot, Exam, FocusSession, LearningGroup, StudyChat, StudyMaterial, StudyMemory, StudyTask, Topic, UserBadge, UserProfile, UserStats } from "../types";
 
 interface CloudBundle {
   user: UserProfile | null;
@@ -9,6 +9,8 @@ interface CloudBundle {
   topics: Topic[];
   studyTasks: StudyTask[];
   materials: StudyMaterial[];
+  chats: StudyChat[];
+  memories: StudyMemory[];
   learningGroups: LearningGroup[];
   stats: UserStats | null;
   focusSessions: FocusSession[];
@@ -105,6 +107,33 @@ function mapMaterialToRow(material: StudyMaterial, userId: string) {
     created_at: material.createdAt,
     updated_at: material.updatedAt,
     deleted_at: material.deletedAt ?? null
+  };
+}
+
+function mapChatToRow(chat: StudyChat, userId: string) {
+  return {
+    id: chat.id,
+    user_id: userId,
+    exam_id: chat.examId,
+    title: chat.title,
+    mode: chat.mode,
+    messages: chat.messages,
+    created_at: chat.createdAt,
+    updated_at: chat.updatedAt,
+    deleted_at: chat.deletedAt ?? null
+  };
+}
+
+function mapMemoryToRow(memory: StudyMemory, userId: string) {
+  return {
+    id: memory.id,
+    user_id: userId,
+    exam_id: memory.examId,
+    title: memory.title,
+    content: memory.content,
+    created_at: memory.createdAt,
+    updated_at: memory.updatedAt,
+    deleted_at: memory.deletedAt ?? null
   };
 }
 
@@ -205,6 +234,33 @@ function mapMaterialFromRow(row: Record<string, unknown>): StudyMaterial {
     content: (row.content as string | null) ?? undefined,
     url: (row.url as string | null) ?? undefined,
     fileName: (row.file_name as string | null) ?? undefined,
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+    deletedAt: row.deleted_at as string | null
+  };
+}
+
+function mapChatFromRow(row: Record<string, unknown>): StudyChat {
+  return {
+    id: row.id as string,
+    userId: row.user_id as string,
+    examId: row.exam_id as string,
+    title: row.title as string,
+    mode: row.mode as StudyChat["mode"],
+    messages: (row.messages as StudyChat["messages"] | null) ?? [],
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+    deletedAt: row.deleted_at as string | null
+  };
+}
+
+function mapMemoryFromRow(row: Record<string, unknown>): StudyMemory {
+  return {
+    id: row.id as string,
+    userId: row.user_id as string,
+    examId: row.exam_id as string,
+    title: row.title as string,
+    content: row.content as string,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
     deletedAt: row.deleted_at as string | null
@@ -403,19 +459,21 @@ export function resolveConflicts<T extends { id: string; updatedAt: string; dele
 
 export async function pullFromCloud(userId: string): Promise<CloudBundle> {
   const client = requireSupabase();
-  const [profiles, exams, topics, studyTasks, materials, learningGroups, stats, focusSessions, badges] = await Promise.all([
+  const [profiles, exams, topics, studyTasks, materials, chats, memories, learningGroups, stats, focusSessions, badges] = await Promise.all([
     client.from("profiles").select("*").eq("id", userId).maybeSingle(),
     client.from("exams").select("*").eq("user_id", userId),
     client.from("topics").select("*").eq("user_id", userId),
     client.from("study_tasks").select("*").eq("user_id", userId),
     client.from("study_materials").select("*").eq("user_id", userId),
+    client.from("study_chats").select("*").eq("user_id", userId),
+    client.from("study_memories").select("*").eq("user_id", userId),
     client.from("learning_groups").select("*").eq("user_id", userId),
     client.from("user_stats").select("*").eq("user_id", userId).maybeSingle(),
     client.from("focus_sessions").select("*").eq("user_id", userId),
     client.from("badges").select("*").eq("user_id", userId)
   ]);
 
-  [profiles, exams, topics, studyTasks, materials, learningGroups, stats, focusSessions, badges].forEach((result) => {
+  [profiles, exams, topics, studyTasks, materials, chats, memories, learningGroups, stats, focusSessions, badges].forEach((result) => {
     if (result.error && !isMissingRowError(result.error)) {
       throwIfSupabaseError(result.error);
     }
@@ -438,6 +496,8 @@ export async function pullFromCloud(userId: string): Promise<CloudBundle> {
     topics: (topics.data ?? []).map((row) => mapTopicFromRow(row)),
     studyTasks: (studyTasks.data ?? []).map((row) => mapTaskFromRow(row)),
     materials: (materials.data ?? []).map((row) => mapMaterialFromRow(row)),
+    chats: (chats.data ?? []).map((row) => mapChatFromRow(row)),
+    memories: (memories.data ?? []).map((row) => mapMemoryFromRow(row)),
     learningGroups: (learningGroups.data ?? []).map((row) => mapLearningGroupFromRow(row)),
     stats: stats.data
       ? {
@@ -480,6 +540,18 @@ export async function syncStudyTask(task: StudyTask, userId: string): Promise<vo
 export async function syncStudyMaterial(material: StudyMaterial, userId: string): Promise<void> {
   const client = requireSupabase();
   const { error } = await client.from("study_materials").upsert(mapMaterialToRow(material, userId), { onConflict: "id" });
+  throwIfSupabaseError(error);
+}
+
+export async function syncStudyChat(chat: StudyChat, userId: string): Promise<void> {
+  const client = requireSupabase();
+  const { error } = await client.from("study_chats").upsert(mapChatToRow(chat, userId), { onConflict: "id" });
+  throwIfSupabaseError(error);
+}
+
+export async function syncStudyMemory(memory: StudyMemory, userId: string): Promise<void> {
+  const client = requireSupabase();
+  const { error } = await client.from("study_memories").upsert(mapMemoryToRow(memory, userId), { onConflict: "id" });
   throwIfSupabaseError(error);
 }
 
@@ -538,6 +610,8 @@ export async function pushToCloud(snapshot: AppSnapshot): Promise<void> {
     client.from("topics").upsert(snapshot.topics.map((entry) => mapTopicToRow(entry, userId)), { onConflict: "id" }),
     client.from("study_tasks").upsert(snapshot.studyTasks.map((entry) => mapTaskToRow(entry, userId)), { onConflict: "id" }),
     client.from("study_materials").upsert(snapshot.materials.map((entry) => mapMaterialToRow(entry, userId)), { onConflict: "id" }),
+    client.from("study_chats").upsert(snapshot.chats.map((entry) => mapChatToRow(entry, userId)), { onConflict: "id" }),
+    client.from("study_memories").upsert(snapshot.memories.map((entry) => mapMemoryToRow(entry, userId)), { onConflict: "id" }),
     client.from("learning_groups").upsert(snapshot.learningGroups.map((entry) => mapLearningGroupToRow(entry, userId)), { onConflict: "id" })
   ];
 

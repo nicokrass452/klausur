@@ -11,7 +11,8 @@ export const ROUTES = {
   studyPlan: "/study-plan",
   focus: "/focus",
   analytics: "/analytics",
-  settings: "/settings"
+  settings: "/settings",
+  files: "/files"
 } as const;
 
 export const SUBJECT_COLORS = ["#0f766e", "#f97316", "#2563eb", "#dc2626", "#7c3aed", "#0891b2", "#65a30d"] as const;

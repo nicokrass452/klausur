@@ -7,6 +7,7 @@ import {
   Clock3,
   LayoutDashboard,
   Settings2,
+  FolderTree,
   Sparkles
 } from "lucide-react";
 import type { TranslationKey } from "../locales/de";
@@ -29,6 +30,7 @@ export const PRIMARY_NAV_ITEMS: NavItem[] = [
 ];
 
 export const SECONDARY_NAV_ITEMS: NavItem[] = [
+  { to: ROUTES.files, labelKey: "nav.files", shortLabelKey: "nav.files.short", icon: FolderTree },
   { to: ROUTES.coach, labelKey: "nav.coach", shortLabelKey: "nav.coach.short", icon: Bot },
   { to: ROUTES.focus, labelKey: "nav.focus", shortLabelKey: "nav.focus.short", icon: Clock3 },
   { to: ROUTES.analytics, labelKey: "nav.analytics", shortLabelKey: "nav.analytics.short", icon: BarChart3 },
@@ -49,7 +51,8 @@ export const PAGE_TITLES: Record<string, TranslationKey> = {
   [ROUTES.studyPlan]: "nav.studyPlan",
   [ROUTES.focus]: "nav.focus",
   [ROUTES.analytics]: "nav.analytics",
-  [ROUTES.settings]: "nav.settings"
+  [ROUTES.settings]: "nav.settings",
+  [ROUTES.files]: "nav.files"
 };
 
 export function isPublicRoute(pathname: string): boolean {

@@ -15,6 +15,7 @@ const StudyPlanPage = lazy(() => import("../pages/StudyPlan").then((module) => (
 const FocusModePage = lazy(() => import("../pages/FocusMode").then((module) => ({ default: module.FocusModePage })));
 const AnalyticsPage = lazy(() => import("../pages/Analytics").then((module) => ({ default: module.AnalyticsPage })));
 const SettingsPage = lazy(() => import("../pages/Settings").then((module) => ({ default: module.SettingsPage })));
+const FilesPage = lazy(() => import("../pages/Files").then((module) => ({ default: module.FilesPage })));
 const LoginPage = lazy(() => import("../pages/Login").then((module) => ({ default: module.LoginPage })));
 
 function withSuspense(element: React.ReactNode) {
@@ -45,6 +46,7 @@ export function AppRouter() {
           <Route path={ROUTES.focus} element={withSuspense(<FocusModePage />)} />
           <Route path={ROUTES.analytics} element={withSuspense(<AnalyticsPage />)} />
           <Route path={ROUTES.settings} element={withSuspense(<SettingsPage />)} />
+          <Route path={ROUTES.files} element={withSuspense(<FilesPage />)} />
         </Route>
       </Route>
     </Routes>
