@@ -26,7 +26,7 @@ interface ParsedStudyCard {
 }
 
 function parseStudyCards(content: string): ParsedStudyCard[] {
-  const pattern = /Frage:\s*([\s\S]*?)(?:\n|\s)Antwort:\s*([\s\S]*?)(?=(?:\n\s*Frage:)|$)/gi;
+  const pattern = /(?:Frage|Question):\s*([\s\S]*?)(?:\n|\s)(?:Antwort|Answer):\s*([\s\S]*?)(?=(?:\n\s*(?:Frage|Question):)|$)/gi;
   const cards: ParsedStudyCard[] = [];
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(content)) !== null) {
@@ -161,6 +161,7 @@ export function CoachPage() {
 
   const context = useMemo(
     () => ({
+      language,
       stats: {
         studyTime: stats.studyTime,
         streak: stats.streak,
@@ -221,7 +222,7 @@ export function CoachPage() {
         content: entry.content
       }))
     }),
-    [activeExams, activeTasks, activeTopics, activeMaterials, activeMemories, stats]
+    [activeExams, activeTasks, activeTopics, activeMaterials, activeMemories, language, stats]
   );
 
   async function submitMessage(event?: FormEvent<HTMLFormElement>): Promise<void> {

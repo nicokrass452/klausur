@@ -12,6 +12,8 @@
 
 Die Provider-APIs werden nicht direkt aus dem Browser aufgerufen. Das Frontend ruft die Edge Function `ai-coach` auf; sie prüft das Supabase-Auth-JWT, validiert Eingaben und versucht nacheinander GLM, DeepSeek und Google Gemini. Erst wenn alle drei Provider fehlschlagen, wird der lokale Mock-Fallback verwendet.
 
+Alle Provider erhalten denselben zentralen KlausurCoach-System-Prompt. Er definiert Grounding auf App-Daten, sprachabhängige Lernmodi, didaktische Qualitätsregeln, sichere Änderungsvorschläge, den Umgang mit Memory und Materialien sowie Ausgabeprotokolle für Mermaid und Charts. Materialien und gespeicherte Inhalte werden ausdrücklich als nicht vertrauenswürdige Daten behandelt; insbesondere darf die KI nicht behaupten, den Inhalt einer PDF gelesen zu haben, wenn nur Metadaten vorliegen.
+
 ```text
 Frontend → Supabase Edge Function "ai-coach" → GLM API
                                       ↓
