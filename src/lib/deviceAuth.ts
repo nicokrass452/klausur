@@ -83,10 +83,15 @@ function requireSupabaseClient() {
   return supabase;
 }
 
-function asBufferSource(bytes: Uint8Array): ArrayBuffer {
-  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-}
-
+/*
+ * WebCrypto accepts any BufferSource, but a bare ArrayBuffer is validated by
+ * identity against the realm's own constructor. Under jsdom the buffer carved
+ * out of a view belongs to the jsdom realm, and Node 20's WebCrypto rejects it:
+ * "'salt' of 'Pbkdf2Params' is not instance of ArrayBuffer, Buffer, TypedArray,
+ * or DataView". A TypedArray is validated with ArrayBuffer.isView(), which is
+ * realm-agnostic, so views are handed to WebCrypto as-is throughout this file
+ * rather than sliced into a bare buffer first.
+ */
 // IndexedDB setup
 const DB_NAME = 'klausurplaner-device';
 const DB_VERSION = 1;
@@ -284,7 +289,7 @@ export async function verifyOfflineGrant(grant: string): Promise<OfflineGrantPay
     // Import public key (embedded at build time)
     const publicKey = await crypto.subtle.importKey(
       'spki',
-      asBufferSource(base64UrlToBytes(import.meta.env.VITE_OFFLINE_PUBLIC_KEY)),
+      base64UrlToBytes(import.meta.env.VITE_OFFLINE_PUBLIC_KEY),
       ALGORITHM,
       true,
       ['verify']
@@ -303,7 +308,7 @@ export async function verifyOfflineGrant(grant: string): Promise<OfflineGrantPay
     const valid = await crypto.subtle.verify(
       SIGN_ALGORITHM,
       publicKey,
-      asBufferSource(signature),
+      signature,
       new TextEncoder().encode(data)
     );
 
