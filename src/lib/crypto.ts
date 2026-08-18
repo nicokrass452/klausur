@@ -19,7 +19,7 @@ export function base64UrlEncodeJson(value: unknown): string {
   );
 }
 
-export function base64UrlToBytes(str: string): Uint8Array {
+export function base64UrlToBytes(str: string): Uint8Array<ArrayBuffer> {
   let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
   while (base64.length % 4) {
     base64 += '=';
@@ -48,6 +48,6 @@ export async function hashToken(token: string): Promise<string> {
   return bytesToHex(new Uint8Array(hash));
 }
 
-export async function generateRandomBytes(length: number): Promise<Uint8Array> {
+export async function generateRandomBytes(length: number): Promise<Uint8Array<ArrayBuffer>> {
   return crypto.getRandomValues(new Uint8Array(length));
 }

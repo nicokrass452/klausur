@@ -30,7 +30,7 @@ export interface EncryptedCache {
 /**
  * Derive encryption key from grant and salt
  */
-async function deriveCacheKey(grant: string, salt: Uint8Array): Promise<CryptoKey> {
+async function deriveCacheKey(grant: string, salt: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(grant),
