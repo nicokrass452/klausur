@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "kimi-code" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "kimi-code" ]
 
 jobs:
   build-and-test:
