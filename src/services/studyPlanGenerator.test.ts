@@ -141,6 +141,131 @@ createdAt: new Date().toISOString(),
       expect(result.tasks[0]?.topicId).toBe("topic-weak");
       expect(result.tasks.some((task) => task.task.includes("nacharbeiten") || task.task.includes("wiederholen"))).toBe(true);
     });
+
+    it("never schedules a task on or after the exam date, even with more topics than days", () => {
+      const baseDate = new Date("2024-01-01T10:00:00Z");
+      const examDate = new Date("2024-01-04T10:00:00Z"); // 3 days out
+      const exam: Exam = {
+        id: "exam-crowded",
+        subject: "Mathe",
+        date: toIsoDate(examDate),
+        time: "09:00",
+        room: "A1",
+        notes: "",
+        difficulty: 4,
+        knowledgeLevel: 2,
+        color: "#0f766e",
+        createdAt: baseDate.toISOString(),
+        updatedAt: baseDate.toISOString(),
+        deletedAt: null,
+        dailyMinutes: 30
+      };
+      // 20 topics but only 3 days of runway.
+      const topics: Topic[] = Array.from({ length: 20 }, (_, index) => ({
+        id: `topic-${index}`,
+        examId: exam.id,
+        name: `Thema ${index}`,
+        completed: false,
+        difficulty: 3,
+        estimatedMinutes: 30,
+        updatedAt: baseDate.toISOString(),
+        deletedAt: null
+      }));
+
+      const { tasks } = generateAdaptiveStudyPlanForExam(exam, topics, [], baseDate);
+
+      expect(tasks.length).toBeGreaterThan(0);
+      for (const task of tasks) {
+        expect(task.date < exam.date).toBe(true);
+      }
+    });
+
+    it("still fills every available day when the runway is long", () => {
+      const baseDate = new Date("2024-01-01T10:00:00Z");
+      const exam: Exam = {
+        id: "exam-roomy",
+        subject: "Bio",
+        date: toIsoDate(addDays(startOfDay(baseDate), 15)),
+        time: "09:00",
+        room: "A1",
+        notes: "",
+        difficulty: 3,
+        knowledgeLevel: 3,
+        color: "#0f766e",
+        createdAt: baseDate.toISOString(),
+        updatedAt: baseDate.toISOString(),
+        deletedAt: null,
+        dailyMinutes: 30
+      };
+      const topics: Topic[] = [
+        { id: "topic-only", examId: exam.id, name: "Genetik", completed: false, difficulty: 3, estimatedMinutes: 30, updatedAt: baseDate.toISOString(), deletedAt: null }
+      ];
+
+      const { tasks } = generateAdaptiveStudyPlanForExam(exam, topics, [], baseDate);
+
+      // A single topic must not collapse a 15 day runway into one task.
+      expect(tasks.length).toBe(14);
+      for (const task of tasks) {
+        expect(task.date < exam.date).toBe(true);
+      }
+    });
+
+    it("returns the starter topics it invents so they can be persisted", () => {
+      const baseDate = new Date("2024-01-01T10:00:00Z");
+      const exam: Exam = {
+        id: "exam-empty",
+        subject: "Chemie",
+        date: toIsoDate(addDays(startOfDay(baseDate), 10)),
+        time: "09:00",
+        room: "A1",
+        notes: "",
+        difficulty: 3,
+        knowledgeLevel: 3,
+        color: "#0f766e",
+        createdAt: baseDate.toISOString(),
+        updatedAt: baseDate.toISOString(),
+        deletedAt: null,
+        dailyMinutes: 30
+      };
+
+      const { tasks, createdTopics } = generateAdaptiveStudyPlanForExam(exam, [], [], baseDate);
+
+      expect(createdTopics.length).toBeGreaterThan(0);
+      // Every generated task must resolve against a topic the caller can store.
+      const topicIds = new Set(createdTopics.map((topic) => topic.id));
+      for (const task of tasks) {
+        expect(topicIds.has(task.topicId!)).toBe(true);
+      }
+      for (const topic of createdTopics) {
+        expect(topic.examId).toBe(exam.id);
+      }
+    });
+
+    it("invents no topics when the exam already has some", () => {
+      const baseDate = new Date("2024-01-01T10:00:00Z");
+      const exam: Exam = {
+        id: "exam-has-topics",
+        subject: "Physik",
+        date: toIsoDate(addDays(startOfDay(baseDate), 10)),
+        time: "09:00",
+        room: "A1",
+        notes: "",
+        difficulty: 3,
+        knowledgeLevel: 3,
+        color: "#0f766e",
+        createdAt: baseDate.toISOString(),
+        updatedAt: baseDate.toISOString(),
+        deletedAt: null,
+        dailyMinutes: 30
+      };
+      const topics: Topic[] = [
+        { id: "topic-real", examId: exam.id, name: "Optik", completed: false, difficulty: 3, estimatedMinutes: 30, updatedAt: baseDate.toISOString(), deletedAt: null }
+      ];
+
+      const { createdTopics } = generateAdaptiveStudyPlanForExam(exam, topics, [], baseDate);
+
+      expect(createdTopics).toEqual([]);
+    });
   });
 
   describe("buildAdaptivePlanInsights", () => {
