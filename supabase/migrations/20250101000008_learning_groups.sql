@@ -16,7 +16,12 @@ create unique index if not exists learning_groups_invite_code_key
 
 alter table public.learning_groups enable row level security;
 
+drop policy if exists "learning_groups_select_own" on public.learning_groups;
+drop policy if exists "learning_groups_insert_own" on public.learning_groups;
+drop policy if exists "learning_groups_update_own" on public.learning_groups;
+drop policy if exists "learning_groups_delete_own" on public.learning_groups;
+
 create policy "learning_groups_select_own" on public.learning_groups for select using (auth.uid() = user_id);
 create policy "learning_groups_insert_own" on public.learning_groups for insert with check (auth.uid() = user_id);
-create policy "learning_groups_update_own" on public.learning_groups for update using (auth.uid() = user_id);
+create policy "learning_groups_update_own" on public.learning_groups for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "learning_groups_delete_own" on public.learning_groups for delete using (auth.uid() = user_id);

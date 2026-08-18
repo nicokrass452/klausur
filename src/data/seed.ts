@@ -2,6 +2,29 @@ import { SUBJECT_COLORS } from "../lib/constants";
 import { generateStudyPlanForExam } from "../services/studyPlanGenerator";
 import type { AppSnapshot, Exam, Topic } from "../types";
 
+/**
+ * Seed data is demo content, but it is real data as far as the sync layer is
+ * concerned: it gets pushed to Supabase like anything else. Shared literal ids
+ * would collide across accounts, because `exams.id`, `learning_groups.id` and
+ * `learning_groups.invite_code` are all globally unique in Postgres — the
+ * first account to sync would claim them and every later push would fail. Each
+ * install therefore mints its own ids, which then persist with the store.
+ */
+function seedId(prefix: string): string {
+  const random =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
+  return `${prefix}-${random}`;
+}
+
+function seedInviteCode(prefix: string): string {
+  return `${prefix}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+}
+
+const MATHE_EXAM_ID = seedId("exam");
+const BIO_EXAM_ID = seedId("exam");
+
 const now = new Date();
 const nextExamDate = new Date(now);
 nextExamDate.setDate(now.getDate() + 8);
@@ -11,7 +34,7 @@ secondExamDate.setDate(now.getDate() + 16);
 
 const exams: Exam[] = [
   {
-    id: "exam-mathe",
+    id: MATHE_EXAM_ID,
     subject: "Mathematik",
     date: nextExamDate.toISOString().slice(0, 10),
     time: "09:00",
@@ -26,7 +49,7 @@ const exams: Exam[] = [
     deletedAt: null
   },
   {
-    id: "exam-bio",
+    id: BIO_EXAM_ID,
     subject: "Biologie",
     date: secondExamDate.toISOString().slice(0, 10),
     time: "11:30",
@@ -43,12 +66,12 @@ const exams: Exam[] = [
 ];
 
 const topics: Topic[] = [
-  { id: "topic-m1", examId: "exam-mathe", name: "Ableitungen", completed: false, difficulty: 4, estimatedMinutes: 45, updatedAt: now.toISOString(), deletedAt: null },
-  { id: "topic-m2", examId: "exam-mathe", name: "Kurvendiskussion", completed: false, difficulty: 5, estimatedMinutes: 50, updatedAt: now.toISOString(), deletedAt: null },
-  { id: "topic-m3", examId: "exam-mathe", name: "Extremwerte", completed: false, difficulty: 4, estimatedMinutes: 35, updatedAt: now.toISOString(), deletedAt: null },
-  { id: "topic-b1", examId: "exam-bio", name: "Genetik", completed: true, difficulty: 3, estimatedMinutes: 25, updatedAt: now.toISOString(), deletedAt: null },
-  { id: "topic-b2", examId: "exam-bio", name: "DNA-Replikation", completed: false, difficulty: 4, estimatedMinutes: 40, updatedAt: now.toISOString(), deletedAt: null },
-  { id: "topic-b3", examId: "exam-bio", name: "Proteinbiosynthese", completed: false, difficulty: 4, estimatedMinutes: 40, updatedAt: now.toISOString(), deletedAt: null }
+  { id: seedId("topic"), examId: MATHE_EXAM_ID, name: "Ableitungen", completed: false, difficulty: 4, estimatedMinutes: 45, updatedAt: now.toISOString(), deletedAt: null },
+  { id: seedId("topic"), examId: MATHE_EXAM_ID, name: "Kurvendiskussion", completed: false, difficulty: 5, estimatedMinutes: 50, updatedAt: now.toISOString(), deletedAt: null },
+  { id: seedId("topic"), examId: MATHE_EXAM_ID, name: "Extremwerte", completed: false, difficulty: 4, estimatedMinutes: 35, updatedAt: now.toISOString(), deletedAt: null },
+  { id: seedId("topic"), examId: BIO_EXAM_ID, name: "Genetik", completed: true, difficulty: 3, estimatedMinutes: 25, updatedAt: now.toISOString(), deletedAt: null },
+  { id: seedId("topic"), examId: BIO_EXAM_ID, name: "DNA-Replikation", completed: false, difficulty: 4, estimatedMinutes: 40, updatedAt: now.toISOString(), deletedAt: null },
+  { id: seedId("topic"), examId: BIO_EXAM_ID, name: "Proteinbiosynthese", completed: false, difficulty: 4, estimatedMinutes: 40, updatedAt: now.toISOString(), deletedAt: null }
 ];
 
 export const seedSnapshot: AppSnapshot = {
@@ -57,11 +80,11 @@ export const seedSnapshot: AppSnapshot = {
   studyTasks: exams.flatMap((exam) => generateStudyPlanForExam(exam, topics.filter((topic) => topic.examId === exam.id))),
   learningGroups: [
     {
-      id: "group-demo",
+      id: seedId("group"),
       name: "Lerngruppe Mathe",
-      inviteCode: "MATHE-1234",
+      inviteCode: seedInviteCode("MATHE"),
       memberNames: ["Ich", "Lena"],
-      examIds: ["exam-mathe"],
+      examIds: [MATHE_EXAM_ID],
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
       deletedAt: null
@@ -69,8 +92,8 @@ export const seedSnapshot: AppSnapshot = {
   ],
   materials: [
     {
-      id: "mat-note-mathe",
-      examId: "exam-mathe",
+      id: seedId("mat"),
+      examId: MATHE_EXAM_ID,
       type: "note",
       title: "Formelsammlung Analysis",
       content: "Ableitungsregeln, Wendepunkte, Extremwertkriterien.",
@@ -79,8 +102,8 @@ export const seedSnapshot: AppSnapshot = {
       deletedAt: null
     },
     {
-      id: "mat-video-bio",
-      examId: "exam-bio",
+      id: seedId("mat"),
+      examId: BIO_EXAM_ID,
       type: "video",
       title: "DNA-Replikation erklärt",
       url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",

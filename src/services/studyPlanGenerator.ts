@@ -31,7 +31,10 @@ export function generateStudyPlanForExam(exam: Exam, topics: Topic[], baseDate =
   const examDate = startOfDay(new Date(exam.date));
   const daysUntilExam = Math.max(1, Math.ceil((examDate.getTime() - today.getTime()) / 86400000));
   const priority = calculatePriority(exam.difficulty, exam.knowledgeLevel);
-  const slots = Math.max(topicPool.length, daysUntilExam - 1);
+  // One study slot per day still available before the exam. This used to be
+  // Math.max(topicPool.length, daysUntilExam - 1), which scheduled tasks after
+  // the exam whenever an exam had more topics than it had days remaining.
+  const slots = Math.max(1, daysUntilExam - 1);
   const learnSlots = Math.max(1, Math.round(slots * 0.7));
   const reviewSlots = Math.max(1, Math.round(slots * 0.2));
   const bufferSlots = Math.max(1, slots - learnSlots - reviewSlots);
@@ -91,29 +94,41 @@ export function redistributeMissedStudyTasks(tasks: StudyTask[], examLookup: Map
   });
 }
 
+/**
+ * Builds an adaptive plan for one exam.
+ *
+ * When the exam has no topics yet the planner invents a starter set. Those
+ * topics are returned in `createdTopics` so the caller can persist them: the
+ * generated tasks reference them by `topicId`, and a task pointing at a topic
+ * that was never stored breaks every task -> topic lookup in the UI.
+ */
 export function generateAdaptiveStudyPlanForExam(
   exam: Exam,
   topics: Topic[],
   existingTasks: StudyTask[],
   baseDate = new Date()
-): { tasks: StudyTask[]; insights: AdaptivePlanInsight[] } {
+): { tasks: StudyTask[]; insights: AdaptivePlanInsight[]; createdTopics: Topic[] } {
   const today = startOfDay(baseDate);
   const examDate = startOfDay(new Date(exam.date));
   const daysUntilExam = Math.max(1, Math.ceil((examDate.getTime() - today.getTime()) / 86400000));
   const activeTopics = topics.filter((topic) => !topic.deletedAt);
-  const topicPool = activeTopics.length
-    ? activeTopics
+  const createdTopics: Topic[] = activeTopics.length
+    ? []
     : [
         { id: `${exam.id}-fallback-1`, examId: exam.id, name: "Grundlagen festigen", completed: false, difficulty: 3, estimatedMinutes: 30, updatedAt: new Date().toISOString(), deletedAt: null },
         { id: `${exam.id}-fallback-2`, examId: exam.id, name: "Uebungsaufgaben loesen", completed: false, difficulty: 4, estimatedMinutes: 40, updatedAt: new Date().toISOString(), deletedAt: null },
         { id: `${exam.id}-fallback-3`, examId: exam.id, name: "Probeklausur schreiben", completed: false, difficulty: 5, estimatedMinutes: 50, updatedAt: new Date().toISOString(), deletedAt: null }
       ];
+  const topicPool = activeTopics.length ? activeTopics : createdTopics;
   const examTasks = existingTasks.filter((task) => task.examId === exam.id && !task.deletedAt);
   const insights = buildAdaptiveInsightsForExam(exam, topicPool, examTasks, baseDate);
   const orderedTopics = insights
     .map((insight) => topicPool.find((topic) => topic.id === insight.topicId))
     .filter((topic): topic is Topic => Boolean(topic));
-  const slots = Math.max(topicPool.length, daysUntilExam - 1);
+  // One study slot per day still available before the exam. This used to be
+  // Math.max(topicPool.length, daysUntilExam - 1), which scheduled tasks after
+  // the exam whenever an exam had more topics than it had days remaining.
+  const slots = Math.max(1, daysUntilExam - 1);
   const planStamp = Math.floor(baseDate.getTime() / 1000).toString(36);
   const intervals = SPACED_REPETITION_INTERVALS.filter((value) => value < daysUntilExam);
 
@@ -138,7 +153,7 @@ export function generateAdaptiveStudyPlanForExam(
     };
   });
 
-  return { tasks, insights };
+  return { tasks, insights, createdTopics };
 }
 
 export function buildAdaptivePlanInsights(

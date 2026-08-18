@@ -18,14 +18,19 @@ export interface EncryptedCache {
   iv: string;
 }
 
-function asBufferSource(bytes: Uint8Array): ArrayBuffer {
-  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-}
-
+/*
+ * WebCrypto accepts any BufferSource, but a bare ArrayBuffer is validated by
+ * identity against the realm's own constructor. Under jsdom the buffer carved
+ * out of a view belongs to the jsdom realm, and Node 20's WebCrypto rejects it:
+ * "'salt' of 'Pbkdf2Params' is not instance of ArrayBuffer, Buffer, TypedArray,
+ * or DataView". A TypedArray is validated with ArrayBuffer.isView(), which is
+ * realm-agnostic, so views are handed to WebCrypto as-is throughout this file
+ * rather than sliced into a bare buffer first.
+ */
 /**
  * Derive encryption key from grant and salt
  */
-async function deriveCacheKey(grant: string, salt: Uint8Array): Promise<CryptoKey> {
+async function deriveCacheKey(grant: string, salt: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(grant),
@@ -37,7 +42,7 @@ async function deriveCacheKey(grant: string, salt: Uint8Array): Promise<CryptoKe
   return crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt: asBufferSource(salt),
+      salt,
       iterations: 100000,
       hash: 'SHA-256'
     },
@@ -58,7 +63,7 @@ export async function encryptCache(data: unknown, grant: string): Promise<Encryp
   const encoded = new TextEncoder().encode(JSON.stringify(data));
 
   const encrypted = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: asBufferSource(iv) },
+    { name: 'AES-GCM', iv },
     key,
     encoded
   );
@@ -81,9 +86,9 @@ export async function decryptCache(encrypted: EncryptedCache, grant: string): Pr
     const ciphertext = base64UrlToBytes(encrypted.ciphertext);
 
     const decrypted = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: asBufferSource(iv) },
+      { name: 'AES-GCM', iv },
       key,
-      asBufferSource(ciphertext)
+      ciphertext
     );
 
     return JSON.parse(new TextDecoder().decode(decrypted));

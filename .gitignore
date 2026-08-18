@@ -1,10 +1,22 @@
 /node_modules/
 /dist/
 
-/.env
-/.env.local
+# Secrets — unanchored so a .env in any subdirectory is covered too
+# (e.g. supabase/functions/.env), not just the repo root.
+.env
+.env.*
+!.env.example
+!.env.server.example
+
 /.vscode/
+
+# Supabase CLI scratch state (project ref, linked-project metadata)
+.temp/
+supabase-temp-legacy/
+
+# Build artifacts
+*.tsbuildinfo
+vite-dev*.log
 
 /mcps/
 /nul
-vite-dev*.log

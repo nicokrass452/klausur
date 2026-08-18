@@ -614,7 +614,7 @@ export const useAppStore = create<AppStore>()(
 
           const examTopics = state.topics.filter((topic) => topic.examId === targetExam.id && !topic.deletedAt);
           const existingExamTasks = state.studyTasks.filter((task) => task.examId === targetExam.id && !task.deletedAt);
-          const { tasks: adaptiveTasks } = generateAdaptiveStudyPlanForExam(targetExam, examTopics, existingExamTasks);
+          const { tasks: adaptiveTasks, createdTopics } = generateAdaptiveStudyPlanForExam(targetExam, examTopics, existingExamTasks);
           const replacedTasks = state.studyTasks.filter(
             (task) => task.examId === targetExam.id && !task.deletedAt && task.status !== "done"
           );
@@ -625,9 +625,14 @@ export const useAppStore = create<AppStore>()(
               op: "upsert" as const,
               payload: { ...task, deletedAt, updatedAt: deletedAt }
             })),
-            ...adaptiveTasks.map((task) => ({ table: "study_tasks" as const, op: "upsert" as const, payload: task }))
+            ...adaptiveTasks.map((task) => ({ table: "study_tasks" as const, op: "upsert" as const, payload: task })),
+            // The planner invents starter topics for an exam that has none. They
+            // have to be stored, otherwise the tasks reference a topic that does
+            // not exist and every task -> topic lookup returns undefined.
+            ...createdTopics.map((topic) => ({ table: "topics" as const, op: "upsert" as const, payload: topic }))
           ];
           return {
+            topics: [...state.topics, ...createdTopics],
             studyTasks: [
               ...state.studyTasks.filter((task) => task.examId !== targetExam.id || task.deletedAt || task.status === "done"),
               ...adaptiveTasks

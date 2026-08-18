@@ -193,4 +193,83 @@ describe("useAppStore", () => {
     expect(tasks.find((task) => task.id === "task-open")).toBeUndefined();
     expect(tasks.some((task) => task.id.startsWith(`${examId}-adaptive-`))).toBe(true);
   });
+  it("persists the starter topics the adaptive planner invents for a topicless exam", () => {
+    const futureExamDate = new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10);
+    const examId = "exam-no-topics";
+    useAppStore.setState({
+      authMode: "signed-out",
+      exams: [{
+        id: examId,
+        subject: "Chemie",
+        date: futureExamDate,
+        time: "10:00",
+        room: "A1",
+        notes: "",
+        difficulty: 3,
+        knowledgeLevel: 2,
+        color: "#0f766e",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        deletedAt: null,
+        dailyMinutes: 30
+      }],
+      topics: [],
+      studyTasks: []
+    });
+
+    useAppStore.getState().regenerateAdaptiveStudyPlan(examId);
+
+    const state = useAppStore.getState();
+    const topicIds = new Set(state.topics.map((topic) => topic.id));
+    const examTasks = state.studyTasks.filter((task) => task.examId === examId);
+
+    expect(examTasks.length).toBeGreaterThan(0);
+    expect(state.topics.length).toBeGreaterThan(0);
+    // Every task must resolve to a topic that actually exists in the store.
+    for (const task of examTasks) {
+      expect(topicIds.has(task.topicId!)).toBe(true);
+    }
+  });
+
+  it("never schedules adaptive tasks past the exam date", () => {
+    const examDate = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+    const examId = "exam-tight";
+    useAppStore.setState({
+      authMode: "signed-out",
+      exams: [{
+        id: examId,
+        subject: "Mathe",
+        date: examDate,
+        time: "10:00",
+        room: "A1",
+        notes: "",
+        difficulty: 4,
+        knowledgeLevel: 2,
+        color: "#0f766e",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        deletedAt: null,
+        dailyMinutes: 30
+      }],
+      topics: Array.from({ length: 12 }, (_, index) => ({
+        id: `tight-topic-${index}`,
+        examId,
+        name: `Thema ${index}`,
+        completed: false,
+        difficulty: 3,
+        estimatedMinutes: 30,
+        updatedAt: new Date().toISOString(),
+        deletedAt: null
+      })),
+      studyTasks: []
+    });
+
+    useAppStore.getState().regenerateAdaptiveStudyPlan(examId);
+
+    const tasks = useAppStore.getState().studyTasks.filter((task) => task.examId === examId);
+    expect(tasks.length).toBeGreaterThan(0);
+    for (const task of tasks) {
+      expect(task.date < examDate).toBe(true);
+    }
+  });
 });
